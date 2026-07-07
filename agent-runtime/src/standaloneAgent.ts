@@ -216,7 +216,7 @@ export class StandaloneAgent implements AgentHost {
         // (a sync member of AgentInfrastructure) can be served from memory.
         await agent.hydrateConversationCache();
 
-        agent.selectBehavior(initArgs);
+        await agent.selectBehavior(initArgs);
 
         // getTemplateDetails() synchronously throws when nothing is cached
         // yet, but ALSO fires an un-awaited `ensureTemplateDetails()` call as
@@ -236,6 +236,7 @@ export class StandaloneAgent implements AgentHost {
 
         agent.broadcast('agent_connected', {
             state: agent.state,
+            // templateDetails may be undefined on bare boot; the AgentConnectedMessage type requires it.
             templateDetails: templateDetails as TemplateDetails,
             previewUrl: options.selfPreviewBaseUrl ?? '',
         });
@@ -264,7 +265,7 @@ export class StandaloneAgent implements AgentHost {
      * since phase 1 supports phasic/agentic and this default was never an
      * explicit request for the unsupported behavior.
      */
-    private selectBehavior(initArgs: StandaloneInitArgs): void {
+    private async selectBehavior(initArgs: StandaloneInitArgs): Promise<void> {
         const persistedProjectType = this.state.projectType;
         const projectType: ProjectType =
             initArgs.projectType ??
@@ -294,7 +295,7 @@ export class StandaloneAgent implements AgentHost {
 
         this.objective = new ProjectObjective(this as AgentInfrastructure<BaseProjectState>, projectType);
 
-        this.behavior.onStart();
+        await this.behavior.onStart({ behaviorType, projectType });
 
         // Phase-1 stub: skip the ModelConfigService D1 read entirely. Passing
         // `undefined` (rather than an empty object, which cannot structurally
@@ -425,13 +426,14 @@ export class StandaloneAgent implements AgentHost {
     }
 
     clearConversation(): void {
+        const clearedMessageCount = this.conversationCache.fullHistory.length;
         this.conversationCache = { id: DEFAULT_CONVERSATION_ID, runningHistory: [], fullHistory: [] };
         void this.conversationStore.clear().catch((error) => {
             this.logger().error('Failed to clear conversation store', error);
         });
         this.broadcast(WebSocketMessageResponses.CONVERSATION_CLEARED as 'conversation_cleared', {
             message: 'Conversation history cleared',
-            clearedMessageCount: 0,
+            clearedMessageCount,
         });
     }
 

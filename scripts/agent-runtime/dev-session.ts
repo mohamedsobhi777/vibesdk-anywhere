@@ -202,94 +202,100 @@ export async function runSmokeSession(options: RunSmokeSessionOptions): Promise<
         throw new Error(`Failed to seed agent_sessions row: ${seedError.message}`);
     }
 
-    const sessionJwt = await signSessionJwt(sessionId, keys.jwtSecret);
-
-    const received: ReceivedMessage[] = [];
-    let modelConfigsResolve: (() => void) | undefined;
-    const modelConfigsReceived = new Promise<void>((resolve) => {
-        modelConfigsResolve = resolve;
-    });
-
-    // Browser-side client: anon key + per-session JWT, exactly as main.ts
-    // wires the agent-side client (see main.ts's ONE-CLIENT comment).
-    const browserClient = createClient(keys.apiUrl, keys.anonKey, {
-        global: { headers: { Authorization: `Bearer ${sessionJwt}` } },
-    });
-    await browserClient.realtime.setAuth(sessionJwt);
-    const channel = browserClient.channel(`session:${sessionId}`, {
-        config: { broadcast: { self: false }, private: true },
-    });
-    channel.on('broadcast', { event: 'message' }, ({ payload }) => {
-        const message = payload as ReceivedMessage;
-        received.push(message);
-        if (message.type === 'model_configs_info') {
-            modelConfigsResolve?.();
-        }
-    });
-    await waitForReady(channel, REALTIME_READY_TIMEOUT_MS);
-
-    const agentProc = Bun.spawn(['bun', AGENT_MAIN_ENTRY], {
-        env: {
-            ...process.env,
-            SESSION_ID: sessionId,
-            AGENT_ID: agentId,
-            SUPABASE_URL: keys.apiUrl,
-            SUPABASE_ANON_KEY: keys.anonKey,
-            SUPABASE_SESSION_JWT: sessionJwt,
-            TEMPLATES_BASE_URL: PLACEHOLDER_TEMPLATES_BASE_URL,
-            WORKSPACE_DIR: `/tmp/vibesdk-smoke-${sessionId}`,
-        },
-        stdout: 'inherit',
-        stderr: 'inherit',
-    });
-
+    // Everything below runs against a seeded agent_sessions row. Wrap it so
+    // the row is always deleted — timeout, early agent exit, or assertion
+    // failure — not just the happy path, so repeated failed runs don't
+    // orphan rows in the local stack.
     try {
-        const timeoutController = new AbortController();
-        const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
+        const sessionJwt = await signSessionJwt(sessionId, keys.jwtSecret);
+
+        const received: ReceivedMessage[] = [];
+        let modelConfigsResolve: (() => void) | undefined;
+        const modelConfigsReceived = new Promise<void>((resolve) => {
+            modelConfigsResolve = resolve;
+        });
+
+        // Browser-side client: anon key + per-session JWT, exactly as main.ts
+        // wires the agent-side client (see main.ts's ONE-CLIENT comment).
+        const browserClient = createClient(keys.apiUrl, keys.anonKey, {
+            global: { headers: { Authorization: `Bearer ${sessionJwt}` } },
+        });
+        await browserClient.realtime.setAuth(sessionJwt);
+        const channel = browserClient.channel(`session:${sessionId}`, {
+            config: { broadcast: { self: false }, private: true },
+        });
+        channel.on('broadcast', { event: 'message' }, ({ payload }) => {
+            const message = payload as ReceivedMessage;
+            received.push(message);
+            if (message.type === 'model_configs_info') {
+                modelConfigsResolve?.();
+            }
+        });
+        await waitForReady(channel, REALTIME_READY_TIMEOUT_MS);
+
+        const agentProc = Bun.spawn(['bun', AGENT_MAIN_ENTRY], {
+            env: {
+                ...process.env,
+                SESSION_ID: sessionId,
+                AGENT_ID: agentId,
+                SUPABASE_URL: keys.apiUrl,
+                SUPABASE_ANON_KEY: keys.anonKey,
+                SUPABASE_SESSION_JWT: sessionJwt,
+                TEMPLATES_BASE_URL: PLACEHOLDER_TEMPLATES_BASE_URL,
+                WORKSPACE_DIR: `/tmp/vibesdk-smoke-${sessionId}`,
+            },
+            stdout: 'inherit',
+            stderr: 'inherit',
+        });
+
         try {
-            await Promise.race([
-                modelConfigsReceived,
-                new Promise<never>((_resolve, reject) => {
-                    timeoutController.signal.addEventListener('abort', () => {
-                        reject(new Error(`Timed out after ${timeoutMs}ms waiting for model_configs_info`));
-                    });
-                }),
-                agentProc.exited.then((code) => {
-                    throw new Error(`Agent process exited early with code ${code} before responding`);
-                }),
-            ]);
+            const timeoutController = new AbortController();
+            const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
+            try {
+                await Promise.race([
+                    modelConfigsReceived,
+                    new Promise<never>((_resolve, reject) => {
+                        timeoutController.signal.addEventListener('abort', () => {
+                            reject(new Error(`Timed out after ${timeoutMs}ms waiting for model_configs_info`));
+                        });
+                    }),
+                    agentProc.exited.then((code) => {
+                        throw new Error(`Agent process exited early with code ${code} before responding`);
+                    }),
+                ]);
 
-            await channel.send({
-                type: 'broadcast',
-                event: 'client',
-                payload: { raw: JSON.stringify({ type: 'get_model_configs' }) },
-            });
+                await channel.send({
+                    type: 'broadcast',
+                    event: 'client',
+                    payload: { raw: JSON.stringify({ type: 'get_model_configs' }) },
+                });
 
-            await modelConfigsReceived;
+                await modelConfigsReceived;
+            } finally {
+                clearTimeout(timeoutId);
+            }
         } finally {
-            clearTimeout(timeoutId);
+            await channel.unsubscribe();
+            agentProc.kill('SIGTERM');
+            await Promise.race([
+                agentProc.exited,
+                new Promise((resolve) => setTimeout(resolve, AGENT_SHUTDOWN_TIMEOUT_MS)),
+            ]);
         }
+
+        const { data: stateRow, error: stateError } = await admin
+            .from('agent_state')
+            .select('session_id')
+            .eq('session_id', sessionId)
+            .maybeSingle();
+        if (stateError) {
+            throw new Error(`Failed to read agent_state: ${stateError.message}`);
+        }
+
+        return { received, statePersisted: stateRow !== null };
     } finally {
-        await channel.unsubscribe();
-        agentProc.kill('SIGTERM');
-        await Promise.race([
-            agentProc.exited,
-            new Promise((resolve) => setTimeout(resolve, AGENT_SHUTDOWN_TIMEOUT_MS)),
-        ]);
+        await admin.from('agent_sessions').delete().eq('session_id', sessionId);
     }
-
-    const { data: stateRow, error: stateError } = await admin
-        .from('agent_state')
-        .select('session_id')
-        .eq('session_id', sessionId)
-        .maybeSingle();
-    if (stateError) {
-        throw new Error(`Failed to read agent_state: ${stateError.message}`);
-    }
-
-    await admin.from('agent_sessions').delete().eq('session_id', sessionId);
-
-    return { received, statePersisted: stateRow !== null };
 }
 
 function parseCliArgs(argv: string[]): { query: string } {

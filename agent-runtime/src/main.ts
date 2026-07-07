@@ -14,7 +14,7 @@
 
 import { mkdir } from 'node:fs/promises';
 
-import { createClient, type RealtimeChannel } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 
 import { setRuntimeEnv } from 'worker/utils/runtimeEnv';
 import { createHttpTemplateSource, setTemplateSource } from 'worker/services/sandbox/templateSource';
@@ -31,10 +31,11 @@ const HEARTBEAT_INTERVAL_MS = 60_000;
 
 async function main(): Promise<void> {
     const cfg = parseBootstrapEnv(process.env);
+    const env = buildEnvAdapter();
 
     // Route worker-tree code (templateSource, sandbox factory, etc.) to the
     // standalone env/template seams instead of Workers bindings.
-    setRuntimeEnv(buildEnvAdapter());
+    setRuntimeEnv(env);
     setTemplateSource(createHttpTemplateSource(cfg.templatesBaseUrl));
 
     // The GitVersionControl adapter (agent-runtime/src/nodeGitFs.ts) rebases
@@ -128,7 +129,7 @@ async function main(): Promise<void> {
         channelFactory: (topic) =>
             supabase.channel(topic, {
                 config: { broadcast: { self: false }, private: true },
-            }) as unknown as RealtimeChannel,
+            }),
         sessionId: cfg.sessionId,
         onClientMessage: (raw: string) => {
             if (!agentRef.current) {
@@ -145,7 +146,7 @@ async function main(): Promise<void> {
         sessionId: cfg.sessionId,
         agentId: cfg.agentId,
         workspaceDir: cfg.workspaceDir,
-        env: buildEnvAdapter(),
+        env,
         transport,
         stateStore,
         conversationStore,

@@ -4,7 +4,11 @@ import type { SupabaseLike } from './stateStore';
 export interface ConversationClient {
     from(table: string): {
         insert(rows: Record<string, unknown> | Array<Record<string, unknown>>): PromiseLike<{ error: { message: string } | null }>;
-        delete(): { eq(column: string, value: string): PromiseLike<{ error: { message: string } | null }> };
+        delete(): {
+            eq(column: string, value: string): {
+                eq(column: string, value: string): PromiseLike<{ error: { message: string } | null }>;
+            } & PromiseLike<{ error: { message: string } | null }>;
+        };
         select(columns?: string): {
             eq(column: string, value: string): {
                 eq(column: string, value: string): {
@@ -45,8 +49,8 @@ export function createConversationStore(client: ConversationClient, sessionId: s
             if (error) throw new Error(`conversation clear failed: ${error.message}`);
         },
         async replaceAll(kind, messages) {
-            const { error: deleteError } = await client.from('agent_conversations').delete().eq('session_id', sessionId);
-            if (deleteError && deleteError.message) throw new Error(`conversation clear failed: ${deleteError.message}`);
+            const { error: deleteError } = await client.from('agent_conversations').delete().eq('session_id', sessionId).eq('kind', kind);
+            if (deleteError) throw new Error(`conversation replaceAll delete failed: ${deleteError.message}`);
 
             if (messages.length === 0) return;
 

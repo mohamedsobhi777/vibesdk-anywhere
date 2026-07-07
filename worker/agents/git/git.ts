@@ -3,7 +3,7 @@
  */
 
 import git from '@ashishkumar472/cf-git';
-import { SqliteFS, type SqlExecutor } from './fs-adapter';
+import { SqliteFS, type SqlExecutor, type GitFsPromises } from './fs-adapter';
 import type { FileOutputType } from '../schemas';
 import * as Diff from 'diff';
 
@@ -31,21 +31,39 @@ export interface GitShowResult {
 
 type FileSnapshot = Omit<FileOutputType, 'filePurpose'>;
 
+export interface GitVersionControlOptions {
+    author?: { name: string; email: string };
+    /** Override the default SQLite-backed filesystem (e.g. for a node:fs/promises adapter). */
+    fs?: GitFsPromises;
+}
+
 export class GitVersionControl {
     private onFilesChangedCallback?: () => void;
-    public fs: SqliteFS;
+    /**
+     * Concrete SQLite-backed fs, only constructed on the default (no override) path.
+     * Callers that reach for SqliteFS-only members (e.g. exportGitObjects, getStorageStats)
+     * rely on this being the default; it is left unset when an fs override is injected.
+     */
+    public fs!: SqliteFS;
+    /** The fs surface actually used for git operations -- default SqliteFS or the injected override. */
+    private readonly gitFs: GitFsPromises;
     private author: { name: string; email: string };
-    
+
     private get gitConfig() {
-        return { fs: this.fs, dir: '/' } as const;
+        return { fs: this.gitFs, dir: '/' } as const;
     }
 
-    constructor(sql: SqlExecutor, author?: { name: string; email: string }) {
-        this.fs = new SqliteFS(sql);
-        this.author = author || { name: 'Vibesdk', email: 'vibesdk-bot@cloudflare.com' };
-        
-        // Initialize SQLite table synchronously
-        this.fs.init();
+    constructor(sql: SqlExecutor, options?: GitVersionControlOptions) {
+        this.author = options?.author || { name: 'Vibesdk', email: 'vibesdk-bot@cloudflare.com' };
+
+        if (options?.fs) {
+            this.gitFs = options.fs;
+        } else {
+            this.fs = new SqliteFS(sql);
+            // Initialize SQLite table synchronously
+            this.fs.init();
+            this.gitFs = this.fs;
+        }
     }
 
     setOnFilesChangedCallback(callback: () => void): void {
@@ -85,7 +103,7 @@ export class GitVersionControl {
         for (const file of files) {
             try {
                 const path = this.normalizePath(file.filePath);
-                await this.fs.writeFile(path, file.fileContents);
+                await this.gitFs.writeFile(path, file.fileContents);
                 await git.add({ ...this.gitConfig, filepath: path, cache: {} });
             } catch (error) {
                 console.error(`[Git] Failed to stage file ${file}:`, error);
@@ -128,7 +146,7 @@ export class GitVersionControl {
     private async hasChanges(): Promise<boolean> {
         try {
             // Get top-level entries excluding .git to pass as filepaths.
-            const entries = await this.fs.readdir('/');
+            const entries = await this.gitFs.readdir('/');
             const workingTreePaths = entries.filter(e => e !== '.git');
             if (workingTreePaths.length === 0) return false;
 

@@ -15,6 +15,27 @@ export interface SqlExecutor {
 	<T = unknown>(query: TemplateStringsArray, ...values: SqlValue[]): T[];
 }
 
+/**
+ * The promise-based fs surface isomorphic-git (and GitVersionControl) needs.
+ * Derived from SqliteFS so any injected filesystem (e.g. a node:fs/promises
+ * adapter) stays structurally compatible with the default implementation.
+ */
+export type GitFsPromises = Pick<
+	SqliteFS,
+	| 'readFile'
+	| 'writeFile'
+	| 'unlink'
+	| 'mkdir'
+	| 'readdir'
+	| 'stat'
+	| 'lstat'
+	| 'rmdir'
+	| 'symlink'
+	| 'readlink'
+	| 'chmod'
+	| 'rename'
+>;
+
 // 1.8 MB per chunk
 const CHUNK_SIZE = 1800 * 1024;
 

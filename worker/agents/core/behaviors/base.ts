@@ -1,4 +1,4 @@
-import { Connection } from 'agents';
+import type { Connection } from 'agents';
 import { 
     FileConceptType,
     FileOutputType,

@@ -1,11 +1,14 @@
-import { Connection } from 'agents';
 import { createLogger } from '../../logger';
 import { WebSocketMessageRequests, WebSocketMessageResponses } from '../constants';
 import { WebSocketMessage, WebSocketMessageData, WebSocketMessageType } from '../../api/websocketTypes';
 import { MAX_IMAGES_PER_MESSAGE, MAX_IMAGE_SIZE_BYTES, type ImageAttachment } from '../../types/image-attachment';
 import { type CredentialsPayload } from '../inferutils/config.types';
 import { checkUsageAndBalance } from '../../services/rate-limit';
-import type { CodeGeneratorAgent } from './codingAgent';
+import type { AgentInfrastructure } from './AgentCore';
+import type { AgentState } from './state';
+import type { BaseCodingBehavior } from './behaviors/base';
+import type { ConversationMessageLoader } from './conversation/MessageLoader';
+import type { DeployOptions, DeployResult } from './types';
 
 // Type for incoming WebSocket messages
 interface IncomingWebSocketMessage {
@@ -20,11 +23,41 @@ interface IncomingWebSocketMessage {
     };
 }
 
+/**
+ * Minimal connection surface the handler uses (satisfied by agents-SDK
+ * Connection and by the standalone Realtime shim).
+ */
+export interface ConnectionLike {
+    id: string;
+    send(data: string): void;
+    url?: string | null;
+}
+
+/**
+ * Structural surface of the agent as seen by the message handler —
+ * implemented by CodeGeneratorAgent (Workers) and StandaloneAgent (Bun).
+ *
+ * `CodeGeneratorAgent` only directly exposes `AgentInfrastructure` plus a
+ * handful of its own methods (it delegates most coding-agent behavior to a
+ * private `this.behavior` field, so `ICodingAgent` does not apply here).
+ * Every member below beyond `AgentInfrastructure` is one the handler calls
+ * directly on `agent`, with its signature copied verbatim from
+ * `codingAgent.ts`.
+ */
+export type AgentHost = AgentInfrastructure<AgentState> & {
+    getBehavior(): BaseCodingBehavior<AgentState>;
+    handleUserInput(userMessage: string, images?: ImageAttachment[]): Promise<void>;
+    deployProject(options?: DeployOptions): Promise<DeployResult>;
+    handleVaultUnlocked(): void;
+    handleVaultLocked(): void;
+    getConversationMessageLoader(): ConversationMessageLoader;
+};
+
 const logger = createLogger('CodeGeneratorWebSocket');
 
 export async function handleWebSocketMessage(
-    agent: CodeGeneratorAgent, 
-    connection: Connection, 
+    agent: AgentHost,
+    connection: ConnectionLike,
     message: string
 ): Promise<void> {
     try {
@@ -306,14 +339,14 @@ export async function handleWebSocketMessage(
     }
 }
 
-export function handleWebSocketClose(agent: CodeGeneratorAgent, connection: Connection): void {
+export function handleWebSocketClose(agent: AgentHost, connection: ConnectionLike): void {
     logger.info(`WebSocket connection closed: ${connection.id}`);
     // Clear vault session on disconnect for security
     agent.handleVaultLocked();
 }
 
 export function broadcastToConnections<T extends WebSocketMessageType>(
-    agent: { getWebSockets(): WebSocket[] },
+    agent: Pick<AgentHost, 'getWebSockets'>,
     type: T,
     data: WebSocketMessageData<T>
 ): void {
@@ -324,8 +357,8 @@ export function broadcastToConnections<T extends WebSocketMessageType>(
 }
 
 export function sendToConnection<T extends WebSocketMessageType>(
-    connection: WebSocket, 
-    type: T, 
+    connection: Pick<ConnectionLike, 'send' | 'url'>,
+    type: T,
     data: WebSocketMessageData<T>
 ): void {
     try {
@@ -336,6 +369,6 @@ export function sendToConnection<T extends WebSocketMessageType>(
     }
 }
 
-export function sendError(connection: WebSocket, errorMessage: string): void {
+export function sendError(connection: Pick<ConnectionLike, 'send' | 'url'>, errorMessage: string): void {
     sendToConnection(connection, 'error', { error: errorMessage });
 }

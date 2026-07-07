@@ -4,7 +4,7 @@ import { AuthUser } from '../../types/auth-types';
 import { extractTokenWithMetadata, extractRequestMetadata } from '../../utils/authUtils';
 import { captureSecurityEvent } from '../../observability/sentry';
 import { KVRateLimitStore } from './KVRateLimitStore';
-import { RateLimitResult } from './DORateLimitStore';
+import type { RateLimitResult } from './DORateLimitStore';
 import { RateLimitExceededError, SecurityError } from 'shared/types/errors';
 import { isDev } from 'worker/utils/envs';
 import { AI_MODEL_CONFIG, AIModels } from 'worker/agents/inferutils/config.types';

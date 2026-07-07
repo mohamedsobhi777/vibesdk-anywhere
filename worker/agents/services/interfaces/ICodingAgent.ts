@@ -88,5 +88,5 @@ export interface ICodingAgent {
     
     get git(): GitVersionControl;
     
-    getSandboxServiceClient(): BaseSandboxService;
+    getSandboxServiceClient(): Promise<BaseSandboxService>;
 }

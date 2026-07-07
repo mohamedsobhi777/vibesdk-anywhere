@@ -56,17 +56,21 @@ export class DeploymentManager extends BaseAgentService<BaseProjectState> implem
     }
 
     /**
-     * Cache is tied to current sessionId and invalidated on reset
+     * Cache is tied to current sessionId and invalidated on reset.
+     * Async because `getSandboxService` dynamically imports the concrete
+     * Workers-only sandbox client modules (see
+     * worker/services/sandbox/factory.ts) so they are never loaded under a
+     * non-Workers runtime that has installed an override factory.
      */
-    public getClient(): BaseSandboxService {
+    public async getClient(): Promise<BaseSandboxService> {
         if (!this.cachedSandboxClient) {
             const logger = this.getLog();
-            logger.info('Creating sandbox service client', { 
-                sessionId: this.getSessionId(), 
-                agentId: this.getAgentId() 
+            logger.info('Creating sandbox service client', {
+                sessionId: this.getSessionId(),
+                agentId: this.getAgentId()
             });
-            this.cachedSandboxClient = getSandboxService(
-                this.getSessionId(), 
+            this.cachedSandboxClient = await getSandboxService(
+                this.getSessionId(),
                 this.getAgentId()
             );
         }
@@ -130,8 +134,8 @@ export class DeploymentManager extends BaseAgentService<BaseProjectState> implem
     ): Promise<void> {
         const { commandsHistory } = this.getState();
         const logger = this.getLog();
-        const client = this.getClient();
-        
+        const client = await this.getClient();
+
         if (!commandsHistory || commandsHistory.length === 0) {
             return;
         }
@@ -185,7 +189,7 @@ export class DeploymentManager extends BaseAgentService<BaseProjectState> implem
         
         this.healthCheckInterval = setInterval(async () => {
             try {
-                const client = this.getClient();
+                const client = await this.getClient();
                 const status = await client.getInstanceStatus(instanceId);
                 
                 if (!status.success || !status.isHealthy) {
@@ -224,7 +228,7 @@ export class DeploymentManager extends BaseAgentService<BaseProjectState> implem
         }
 
         const logger = this.getLog();
-        const client = this.getClient();
+        const client = await this.getClient();
 
         logger.info(`Linting code in sandbox instance ${sandboxInstanceId}`);
 
@@ -269,7 +273,7 @@ export class DeploymentManager extends BaseAgentService<BaseProjectState> implem
             throw new Error('No sandbox instance available for runtime error fetching');
         }
         const logger = this.getLog();
-        const client = this.getClient();
+        const client = await this.getClient();
 
         const resp = await client.getInstanceErrors(sandboxInstanceId, clear);
             
@@ -468,12 +472,13 @@ export class DeploymentManager extends BaseAgentService<BaseProjectState> implem
 
         // Write files if any
         if (filesToWrite.length > 0) {
-            const writeResponse = await this.getClient().writeFiles(
+            const client = await this.getClient();
+            const writeResponse = await client.writeFiles(
                 sandboxInstanceId,
                 filesToWrite,
                 commitMessage
             );
-            
+
             if (!writeResponse || !writeResponse.success) {
                 logger.error(`File writing failed. Error: ${writeResponse?.error}`);
                 throw new Error(`File writing failed. Error: ${writeResponse?.error}`);
@@ -486,9 +491,10 @@ export class DeploymentManager extends BaseAgentService<BaseProjectState> implem
         if (clearLogs) {
             try {
                 logger.info('Clearing logs and runtime errors for instance', { instanceId: sandboxInstanceId });
+                const client = await this.getClient();
                 await Promise.all([
-                    this.getClient().getLogs(sandboxInstanceId, true),
-                    this.getClient().clearInstanceErrors(sandboxInstanceId)
+                    client.getLogs(sandboxInstanceId, true),
+                    client.clearInstanceErrors(sandboxInstanceId)
                 ]);
             } catch (error) {
                 logger.error('Failed to clear logs and runtime errors', error);
@@ -513,7 +519,7 @@ export class DeploymentManager extends BaseAgentService<BaseProjectState> implem
         const state = this.getState();
         const { sandboxInstanceId } = state;
         const logger = this.getLog();
-        const client = this.getClient();
+        const client = await this.getClient();
 
         // Check existing instance
         if (sandboxInstanceId) {
@@ -581,7 +587,7 @@ export class DeploymentManager extends BaseAgentService<BaseProjectState> implem
         });
 
         // Create instance
-        const client = this.getClient();
+        const client = await this.getClient();
         const logger = this.getLog();
 
         const createResponse = await client.createInstance({
@@ -637,7 +643,7 @@ export class DeploymentManager extends BaseAgentService<BaseProjectState> implem
     }): Promise<{ deploymentUrl: string | null; deploymentId?: string }> {
         const state = this.getState();
         const logger = this.getLog();
-        const client = this.getClient();
+        const client = await this.getClient();
         const target = request?.target ?? 'platform';
         const callbacks = request?.callbacks;
         

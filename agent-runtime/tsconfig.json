@@ -6,12 +6,12 @@
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["bun-types"],
+    "types": ["bun-types", "@cloudflare/workers-types"],
     "baseUrl": "..",
     "paths": {
       "worker/*": ["./worker/*"],
       "shared/*": ["./shared/*"]
     }
   },
-  "include": ["src", "test", "../worker/agents", "../worker/services", "../worker/utils", "../worker/types", "../worker/api/websocketTypes.ts", "../shared"]
+  "include": ["src", "test"]
 }

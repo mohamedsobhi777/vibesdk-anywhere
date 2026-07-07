@@ -275,7 +275,7 @@ export abstract class BaseCodingBehavior<TState extends BaseProjectState>
         return this.deploymentManager.getSessionId();
     }
 
-    getSandboxServiceClient(): BaseSandboxService {
+    async getSandboxServiceClient(): Promise<BaseSandboxService> {
         return this.deploymentManager.getClient();
     }
 
@@ -783,7 +783,7 @@ export abstract class BaseCodingBehavior<TState extends BaseProjectState>
             let ok = true;
             if (this.state.sandboxInstanceId) {
                 try {
-                    ok = await this.getSandboxServiceClient().updateProjectName(this.state.sandboxInstanceId, newName);
+                    ok = await (await this.getSandboxServiceClient()).updateProjectName(this.state.sandboxInstanceId, newName);
                 } catch (_) {
                     ok = false;
                 }
@@ -886,7 +886,7 @@ export abstract class BaseCodingBehavior<TState extends BaseProjectState>
 
         // If some files not found in FileManager and sandbox exists, try sandbox
         if (notFoundInFileManager.length > 0 && this.state.sandboxInstanceId) {
-            const resp = await this.getSandboxServiceClient().getFiles(
+            const resp = await (await this.getSandboxServiceClient()).getFiles(
                 this.state.sandboxInstanceId,
                 notFoundInFileManager
             );
@@ -906,7 +906,7 @@ export abstract class BaseCodingBehavior<TState extends BaseProjectState>
         if (!sandboxInstanceId) {
             return { success: false, results: [], error: 'No sandbox instance' };
         }
-        const result = await this.getSandboxServiceClient().executeCommands(sandboxInstanceId, commands, timeout);
+        const result = await (await this.getSandboxServiceClient()).executeCommands(sandboxInstanceId, commands, timeout);
         if (shouldSave) {
             // Only persist commands that actually succeeded in the sandbox. Saving the requested
             // commands unconditionally would let a command that failed here still be embedded in
@@ -1016,7 +1016,7 @@ export abstract class BaseCodingBehavior<TState extends BaseProjectState>
                 if (!sandboxInstanceId) {
                     throw new Error('No sandbox instance available');
                 }
-                const resp = await this.getSandboxServiceClient().getFiles(sandboxInstanceId, [path]);
+                const resp = await (await this.getSandboxServiceClient()).getFiles(sandboxInstanceId, [path]);
                 const f = resp.success ? resp.files.find(f => f.filePath === path) : undefined;
                 if (!f) throw new Error(resp.error || `File not found: ${path}`);
                 fileContents = f.fileContents;
@@ -1488,14 +1488,14 @@ export abstract class BaseCodingBehavior<TState extends BaseProjectState>
                         commands: currentChunk
                     });
                     
-                    const resp = await this.getSandboxServiceClient().executeCommands(
+                    const resp = await (await this.getSandboxServiceClient()).executeCommands(
                         state.sandboxInstanceId,
                         currentChunk
                     );
                     if (!resp.results || !resp.success) {
                         this.logger.error('Failed to execute commands', { response: resp });
                         // Check if instance is still running
-                        const status = await this.getSandboxServiceClient().getInstanceStatus(state.sandboxInstanceId);
+                        const status = await (await this.getSandboxServiceClient()).getInstanceStatus(state.sandboxInstanceId);
                         if (!status.success || !status.isHealthy) {
                             this.logger.error(`Instance ${state.sandboxInstanceId} is no longer running`);
                             return;
@@ -1634,7 +1634,7 @@ export abstract class BaseCodingBehavior<TState extends BaseProjectState>
             throw new Error('Cannot get logs: No sandbox instance available');
         }
         
-        const response = await this.getSandboxServiceClient().getLogs(this.state.sandboxInstanceId, _reset, durationSeconds);
+        const response = await (await this.getSandboxServiceClient()).getLogs(this.state.sandboxInstanceId, _reset, durationSeconds);
         if (response.success) {
             return `STDOUT: ${response.logs.stdout}\nSTDERR: ${response.logs.stderr}`;
         } else {

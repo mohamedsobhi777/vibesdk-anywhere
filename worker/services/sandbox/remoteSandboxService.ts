@@ -32,7 +32,7 @@ import {
 } from './sandboxTypes';
 import { BaseSandboxService } from "./BaseSandboxService";
 import { DeploymentTarget } from 'worker/agents/core/types';
-import { env } from 'cloudflare:workers'
+import { getRuntimeEnv } from 'worker/utils/runtimeEnv';
 import z from 'zod';
 import { FileOutputType } from 'worker/agents/schemas';
 
@@ -45,12 +45,27 @@ export async function runnerFetch(url: string, method: 'GET' | 'POST' | 'DELETE'
  * Client for interacting with the Runner Service API.
  */
 export class RemoteSandboxServiceClient extends BaseSandboxService{
-    private static sandboxServiceUrl: string;
-    private static token: string;
+    private static sandboxServiceUrl: string | undefined;
+    private static token: string | undefined;
 
     static init(sandboxServiceUrl: string, token: string) {
         RemoteSandboxServiceClient.sandboxServiceUrl = sandboxServiceUrl;
         RemoteSandboxServiceClient.token = token;
+    }
+
+    /**
+     * Lazily populates the static config from the runtimeEnv seam
+     * (worker/utils/runtimeEnv.ts) on first use, instead of a module-scope
+     * `import { env } from 'cloudflare:workers'` side effect. That import is
+     * unresolvable under Bun and previously ran unconditionally at module
+     * load — before any override hook (e.g. setSandboxServiceFactory) could
+     * prevent this class from ever being constructed. See
+     * worker/services/sandbox/templateSource.ts for the same idiom.
+     */
+    private static ensureInit(): void {
+        if (RemoteSandboxServiceClient.sandboxServiceUrl !== undefined) return;
+        const env = getRuntimeEnv();
+        RemoteSandboxServiceClient.init(env.SANDBOX_SERVICE_URL, env.SANDBOX_SERVICE_API_KEY);
     }
 
     constructor(sandboxId: string) {
@@ -65,6 +80,7 @@ export class RemoteSandboxServiceClient extends BaseSandboxService{
         body?: unknown,
         resetPrevious: boolean = false
     ): Promise<z.infer<T>> {
+        RemoteSandboxServiceClient.ensureInit();
         const url = `${RemoteSandboxServiceClient.sandboxServiceUrl}${endpoint}`;
 
         try {
@@ -250,5 +266,3 @@ export class RemoteSandboxServiceClient extends BaseSandboxService{
         return this.makeRequest('/logs', 'POST', undefined, { logName, log });
     }
 }
-
-RemoteSandboxServiceClient.init(env.SANDBOX_SERVICE_URL, env.SANDBOX_SERVICE_API_KEY);

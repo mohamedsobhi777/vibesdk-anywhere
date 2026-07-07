@@ -28,15 +28,14 @@ import {
     GetLogsResponse,
     ListInstancesResponse,
     TemplateDetails,
-    TemplateInfo,
     InstanceCreationRequest,
 } from './sandboxTypes';
   
 import { createObjectLogger, StructuredLogger } from '../../logger';
-import { env } from 'cloudflare:workers'
 import { ZipExtractor } from './zipExtractor';
 import { FileTreeBuilder } from './fileTreeBuilder';
 import { DeploymentTarget } from 'worker/agents/core/types';
+import { getTemplateSource } from './templateSource';
 
 /**
  * Streaming event for enhanced command execution
@@ -77,12 +76,7 @@ export abstract class BaseSandboxService {
      */
     static async listTemplates(): Promise<TemplateListResponse> {
         try {
-            const response = await env.TEMPLATES_BUCKET.get('template_catalog.json');
-            if (response === null) {
-                throw new Error(`Failed to fetch template catalog: Template catalog not found`);
-            }
-            
-            const templates = await response.json() as TemplateInfo[];
+            const templates = await getTemplateSource().getCatalog();
 
             // For now, just filter out *next* templates
             const filteredTemplates = templates.filter(t => !t.name.includes('next'));
@@ -125,16 +119,9 @@ export abstract class BaseSandboxService {
                     templateDetails: templateDetailsCache[templateName]
                 };
             }
-            // Download template zip from R2
-            const downloadUrl = downloadDir ? `${downloadDir}/${templateName}.zip` : `${templateName}.zip`;
-            const r2Object = await env.TEMPLATES_BUCKET.get(downloadUrl);
-              
-            if (!r2Object) {
-                throw new Error(`Template '${templateName}' not found in bucket`);
-            }
-        
-            const zipData = await r2Object.arrayBuffer();
-            
+            // Download template zip via the template source seam
+            const zipData = await getTemplateSource().getZip(templateName, downloadDir);
+
             // Extract all files in memory
             const allFiles = ZipExtractor.extractFiles(zipData);
             

@@ -39,8 +39,7 @@ import type{
 	UpdateProviderRequest,
 	TestProviderRequest,
 	SecretTemplatesData,
-	AgentConnectionData,
-	AgentStreamingResponse,
+	AgentBootstrapResponse,
 	App,
 	ActiveSessionsData,
 	ApiKeysData,
@@ -599,51 +598,28 @@ class ApiClient {
 		return this.request<UserAppsData>(endpoint);
 	}
 
-	async createAgentSession(args: CodeGenArgs): Promise<AgentStreamingResponse> {
+	async createAgentSession(args: CodeGenArgs): Promise<AgentBootstrapResponse> {
 		try {
-			const { response, data } = await this.requestRaw(
-				'/api/agent',
-				{
-					method: 'POST',
-					body: args,
-					skipJsonParsing: true, // Don't parse JSON for streaming response
-				},
-				false,
-				true,
-			);
-			
-			// Check if response is ok
-			if (!response.ok) {
-				// Check if this is a usage limit error
-				if (response.status === 429 && data?.error?.errorType === 'USAGE_LIMIT_EXCEEDED') {
-					// Emit custom event for usage limit exceeded
-					window.dispatchEvent(new CustomEvent('usage-limit-exceeded', {
-						detail: {
-							message: data.error.message,
-							exceededLimits: data.error.exceededLimits,
-							hasUserToken: data.error.hasUserToken,
-						}
-					}));
-					
-					const errorMessage = data.error.message || 'Free tier limits exceeded';
-					throw new Error(errorMessage);
-				}
-				
-				// Parse error response if available
-				const errorMessage = data?.error?.message || `Agent creation failed with status: ${response.status}`;
-				throw new Error(errorMessage);
+			const response = await this.request<AgentBootstrapResponse>('/api/agent', {
+				method: 'POST',
+				body: args,
+			});
+
+			if (!response.success || !response.data) {
+				throw new Error(response.error?.message || 'Failed to create agent session');
 			}
-			
-			return {
-				success: true,
-				stream: response
-			};
+
+			return response.data;
 		} catch (error) {
+			if (error instanceof SecurityError || error instanceof RateLimitExceededError) {
+				// Already surfaced via a toast inside requestRaw().
+				throw error;
+			}
 			// Handle any network or parsing errors
 			const errorMessage = error instanceof Error ? error.message : 'Failed to create agent session';
 			toast.error(errorMessage);
-			
-            throw new Error(errorMessage);
+
+			throw error instanceof Error ? error : new Error(errorMessage);
 		}
 	}
 
@@ -1016,12 +992,14 @@ class ApiClient {
 	// Agent/CodeGen API Methods
 	// ===============================
 	/**
-	 * Connect to existing agent
+	 * Reconnect to an existing agent session. Returns the same bootstrap
+	 * payload as session creation: the browser rejoins the session's
+	 * Supabase Realtime channel with a freshly minted token.
 	 */
 	async connectToAgent(
 		agentId: string,
-	): Promise<ApiResponse<AgentConnectionData>> {
-		return this.request<AgentConnectionData>(
+	): Promise<ApiResponse<AgentBootstrapResponse>> {
+		return this.request<AgentBootstrapResponse>(
 			`/api/agent/${agentId}/connect`,
 		);
 	}

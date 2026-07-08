@@ -1,4 +1,5 @@
-import { WebSocket } from 'partysocket';
+import type { WebSocket } from 'partysocket';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -14,15 +15,12 @@ import {
 	type TemplateDetails,
 	getBehaviorTypeForProject,
 } from '@/api-types';
-import {
-	createRepairingJSONParser,
-	ndjsonStream,
-} from '@/utils/ndjson-parser/ndjson-parser';
 import { getFileType } from '@/utils/string';
 import { logger } from '@/utils/logger';
 import { mergeFiles } from '@/utils/file-helpers';
 import { apiClient } from '@/lib/api-client';
 import { appEvents } from '@/lib/app-events';
+import { supabase } from '@/lib/supabase';
 import { createWebSocketMessageHandler, type HandleMessageDeps, type BackendErrorDialogState } from '../utils/handle-websocket-message';
 import { isConversationalMessage, addOrUpdateMessage, createUserMessage, handleRateLimitError, createAIMessage, type ChatMessage } from '../utils/message-helpers';
 import { sendWebSocketMessage } from '../utils/websocket-helpers';
@@ -81,24 +79,15 @@ export function useChat({
 	};
 
 	const connectionStatus = useRef<'idle' | 'connecting' | 'connected' | 'failed' | 'retrying'>('idle');
-	const retryCount = useRef(0);
-	const maxRetries = 5;
-	const retryTimeouts = useRef<NodeJS.Timeout[]>([]);
-	// Track whether component is mounted and should attempt reconnects
+	// Track whether component is mounted and should still react to realtime
+	// channel status events (SUBSCRIBED/CHANNEL_ERROR/etc.)
 	const shouldReconnectRef = useRef(true);
 	// Track deployment timeout for cleanup
 	const deploymentTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-	// Track the latest connection attempt to avoid handling stale socket events
-	const connectAttemptIdRef = useRef(0);
-	const connectWithRetryRef = useRef<
-		((
-			wsUrl: string,
-			options?: { disableGenerate?: boolean; isRetry?: boolean },
-		) => void) | null
-	>(null);
-	const handleConnectionFailureRef = useRef<
-		((wsUrl: string, disableGenerate: boolean, reason: string) => void) | null
-	>(null);
+	// The session's Supabase Realtime channel, and whether it is currently
+	// subscribed. Backs the WebSocket-shim's `readyState`.
+	const channelRef = useRef<RealtimeChannel | null>(null);
+	const subscribedRef = useRef(false);
 	const [chatId, setChatId] = useState<string>();
 	// Phasic/agentic flows show a placeholder "Thinking..." message until
 	// the backend streams the first phase. The think behavior streams the user's
@@ -131,7 +120,11 @@ export function useChat({
 
 	const [websocket, setWebsocket] = useState<WebSocket>();
 
-	const [isGeneratingBlueprint, setIsGeneratingBlueprint] = useState(false);
+	// Blueprint generation is no longer a distinct tracked phase: blueprint
+	// content now arrives via channel messages (`blueprint_chunk`,
+	// `agent_connected`) handled directly by the WebSocket message
+	// dispatcher, so `isBootstrapping` alone covers the loading gate.
+	const isGeneratingBlueprint = false;
 	const [isBootstrapping, setIsBootstrapping] = useState(true);
 
 	const [projectStages, setProjectStages] = useState<ProjectStage[]>(defaultStages);
@@ -308,172 +301,89 @@ export function useChat({
 		],
 	);
 
-	// WebSocket connection with retry logic
-	const connectWithRetry = useCallback(
-		async (
-			wsUrl: string,
-			{ disableGenerate = false, isRetry = false }: { disableGenerate?: boolean; isRetry?: boolean } = {},
-		) => {
-			logger.debug(`🔌 ${isRetry ? 'Retrying' : 'Attempting'} WebSocket connection (attempt ${retryCount.current + 1}/${maxRetries + 1}):`, wsUrl);
-			
-			if (!wsUrl) {
-				logger.error('❌ WebSocket URL is required');
-				return;
-			}
-
-			connectionStatus.current = isRetry ? 'retrying' : 'connecting';
-
-			try {
-				logger.debug('🔗 Attempting WebSocket connection to:', wsUrl);
-				const ws = new WebSocket(wsUrl);
-				setWebsocket(ws);
-
-				// Mark this attempt id
-				const myAttemptId = ++connectAttemptIdRef.current;
-
-				// Connection timeout - if connection doesn't open within 30 seconds
-				const connectionTimeout = setTimeout(() => {
-					// Only handle timeout for the latest attempt
-					if (myAttemptId !== connectAttemptIdRef.current) return;
-					if (ws.readyState === WebSocket.CONNECTING) {
-						logger.warn('⏰ WebSocket connection timeout');
-						ws.close();
-						handleConnectionFailureRef.current?.(wsUrl, disableGenerate, 'Connection timeout');
-					}
-				}, 30000);
-
-				ws.addEventListener('open', () => {
-					// Ignore stale open events
-					if (!shouldReconnectRef.current) {
-						ws.close();
-						return;
-					}
-					if (myAttemptId !== connectAttemptIdRef.current) return;
-					
-					clearTimeout(connectionTimeout);
-					logger.info('✅ WebSocket connection established successfully!');
-					connectionStatus.current = 'connected';
-					
-					// Reset retry count on successful connection
-					retryCount.current = 0;
-					
-					// Clear any pending retry timeouts
-					retryTimeouts.current.forEach(clearTimeout);
-					retryTimeouts.current = [];
-
-					// Send success message to user
-					if (isRetry) {
-						// Clear old messages on reconnect to prevent duplicates
-						setMessages(() => [
-							createAIMessage('websocket_reconnected', 'Seems we lost connection for a while there. Fixed now!', true)
-						]);
-					}
-
-					// Always request conversation state explicitly (running/full history)
-					sendWebSocketMessage(ws, 'get_conversation_state');
-
-					// Request file generation for new chats only
-					if (!disableGenerate && urlChatId === 'new') {
-						logger.debug('🔄 Starting code generation for new chat');
-						setIsGenerating(true);
-						sendWebSocketMessage(ws, 'generate_all');
-					}
-				});
-
-				ws.addEventListener('message', (event) => {
-					try {
-						const message: WebSocketMessage = JSON.parse(event.data);
-						handleWebSocketMessage(ws, message);
-					} catch (parseError) {
-						logger.error('❌ Error parsing WebSocket message:', parseError, event.data);
-					}
-				});
-
-				ws.addEventListener('error', (error) => {
-					clearTimeout(connectionTimeout);
-					// Only handle error for the latest attempt and when we should reconnect
-					if (myAttemptId !== connectAttemptIdRef.current) return;
-					if (!shouldReconnectRef.current) return;
-					logger.error('❌ WebSocket error:', error);
-					handleConnectionFailureRef.current?.(wsUrl, disableGenerate, 'WebSocket error');
-				});
-
-				ws.addEventListener('close', (event) => {
-					clearTimeout(connectionTimeout);
-					logger.info(
-						`🔌 WebSocket connection closed with code ${event.code}: ${event.reason || 'No reason provided'}`,
-						event,
-					);
-					// Only handle close for the latest attempt and when we should reconnect
-					if (myAttemptId !== connectAttemptIdRef.current) return;
-					if (!shouldReconnectRef.current) return;
-					// Retry on any close while mounted (including 1000) to improve resilience
-					handleConnectionFailureRef.current?.(wsUrl, disableGenerate, `Connection closed (code: ${event.code})`);
-				});
-
-				return function disconnect() {
-					clearTimeout(connectionTimeout);
-					ws.close();
-				};
-			} catch (error) {
-				logger.error('❌ Error establishing WebSocket connection:', error);
-				handleConnectionFailureRef.current?.(wsUrl, disableGenerate, 'Connection setup failed');
-			}
-		},
-		[maxRetries, handleWebSocketMessage, urlChatId],
-	);
-
-	// Handle connection failures with exponential backoff retry
-	const handleConnectionFailure = useCallback(
-		(wsUrl: string, disableGenerate: boolean, reason: string) => {
+	// Surface a hard Realtime channel failure. Supabase's client retries
+	// transient drops internally, so reaching this path means the channel
+	// could not be (re)established.
+	const handleChannelFailure = useCallback(
+		(reason: string) => {
 			connectionStatus.current = 'failed';
-			
-			if (retryCount.current >= maxRetries) {
-				logger.error(`💥 WebSocket connection failed permanently after ${maxRetries + 1} attempts`);
-				sendMessage(createAIMessage('websocket_failed', `🚨 Connection failed permanently after ${maxRetries + 1} attempts.\n\n❌ Reason: ${reason}\n\n🔄 Please refresh the page to try again.`));
-				
-				// Debug logging for permanent failure
-				onDebugMessage?.('error',
-					'WebSocket Connection Failed Permanently',
-					`Failed after ${maxRetries + 1} attempts. Reason: ${reason}`,
-					'WebSocket Resilience'
-				);
-				return;
-			}
+			logger.error('❌ Realtime channel connection failed:', reason);
 
-			retryCount.current++;
-			
-			// Exponential backoff: 2^attempt * 1000ms (1s, 2s, 4s, 8s, 16s)
-			const retryDelay = Math.pow(2, retryCount.current) * 1000;
-			const maxDelay = 30000; // Cap at 30 seconds
-			const actualDelay = Math.min(retryDelay, maxDelay);
+			sendMessage(createAIMessage('websocket_failed', `🚨 Connection to the agent was lost.\n\n❌ Reason: ${reason}\n\n🔄 Please refresh the page to try again.`));
 
-			logger.warn(`🔄 Retrying WebSocket connection in ${actualDelay / 1000}s (attempt ${retryCount.current + 1}/${maxRetries + 1})`);
-			
-			sendMessage(createAIMessage('websocket_retrying', `🔄 Connection failed. Retrying in ${Math.ceil(actualDelay / 1000)} seconds... (attempt ${retryCount.current + 1}/${maxRetries + 1})\n\n❌ Reason: ${reason}`, true));
-
-			const timeoutId = setTimeout(() => {
-				connectWithRetryRef.current?.(wsUrl, { disableGenerate, isRetry: true });
-			}, actualDelay);
-			
-			retryTimeouts.current.push(timeoutId);
-			
-			// Debug logging for retry attempt
-			onDebugMessage?.('warning',
-				'WebSocket Connection Retry',
-				`Retry ${retryCount.current}/${maxRetries} in ${actualDelay / 1000}s. Reason: ${reason}`,
-				'WebSocket Resilience'
+			onDebugMessage?.('error',
+				'Realtime Channel Connection Failed',
+				reason,
+				'Realtime Connection'
 			);
 		},
-		[maxRetries, onDebugMessage, sendMessage],
+		[sendMessage, onDebugMessage],
 	);
 
-	useEffect(() => {
-		connectWithRetryRef.current = connectWithRetry;
-		handleConnectionFailureRef.current = handleConnectionFailure;
-	}, [connectWithRetry, handleConnectionFailure]);
+	// Join the session's Supabase Realtime channel and wire it up as the
+	// transport for the (unchanged) WebSocket message dispatcher, via a thin
+	// shim exposing only the `.send`/`.readyState` subset that dispatcher and
+	// the preview iframe rely on.
+	const connectChannel = useCallback(
+		async (
+			realtimeChannel: string,
+			token: string,
+			opts?: { disableGenerate?: boolean },
+		) => {
+			logger.debug('🔌 Joining realtime channel:', realtimeChannel);
 
-    // No legacy wrapper; call connectWithRetry directly
+			connectionStatus.current = 'connecting';
+			subscribedRef.current = false;
+
+			const shim = {
+				send: (data: string) => {
+					channelRef.current?.send({
+						type: 'broadcast',
+						event: 'client',
+						payload: { raw: data },
+					});
+				},
+				get readyState() {
+					return subscribedRef.current ? 1 : 0;
+				},
+			};
+
+			await supabase.realtime.setAuth(token);
+			const channel = supabase.channel(realtimeChannel, {
+				config: { broadcast: { self: false }, private: true },
+			});
+			channelRef.current = channel;
+
+			channel.on('broadcast', { event: 'message' }, ({ payload }) => {
+				handleWebSocketMessage(shim as unknown as WebSocket, payload as WebSocketMessage);
+			});
+
+			channel.subscribe((status) => {
+				if (!shouldReconnectRef.current) return;
+
+				if (status === 'SUBSCRIBED') {
+					logger.info('✅ Realtime channel subscribed successfully!');
+					connectionStatus.current = 'connected';
+					subscribedRef.current = true;
+					setWebsocket(shim as unknown as WebSocket);
+
+					// Always request conversation state explicitly (running/full history)
+					sendWebSocketMessage(shim as unknown as WebSocket, 'get_conversation_state');
+
+					// Request file generation for new chats only
+					if (!opts?.disableGenerate) {
+						logger.debug('🔄 Starting code generation for new chat');
+						setIsGenerating(true);
+						sendWebSocketMessage(shim as unknown as WebSocket, 'generate_all');
+					}
+				} else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+					subscribedRef.current = false;
+					handleChannelFailure(`Realtime channel ${status}`);
+				}
+			});
+		},
+		[handleWebSocketMessage, handleChannelFailure],
+	);
 
 	useEffect(() => {
 		async function init() {
@@ -506,35 +416,6 @@ export function useChat({
 					// Prevent duplicate session creation on rerenders while streaming
 					connectionStatus.current = 'connecting';
 
-					// Start new code generation using API client
-					const response = await apiClient.createAgentSession({
-						query: userQuery,
-						projectType,
-						behaviorType: explicitBehaviorType,
-						images: userImages, // Pass images from URL params for multi-modal blueprint
-					});
-
-					const parser = createRepairingJSONParser();
-
-					const result: {
-						websocketUrl: string;
-						agentId: string;
-						behaviorType: BehaviorType;
-						projectType: ProjectType;
-						template: {
-							files: FileType[];
-						};
-					} = {
-						websocketUrl: '',
-						agentId: '',
-						behaviorType: 'phasic',
-						projectType: 'app',
-						template: {
-							files: [],
-						},
-					};
-
-					let startedBlueprintStream = false;
 					const initialBehaviorType = getBehaviorTypeForProject(projectType);
 					if (initialBehaviorType === 'phasic') {
 						sendMessage(
@@ -542,71 +423,28 @@ export function useChat({
 						);
 					}
 
-					for await (const obj of ndjsonStream(response.stream)) {
-                        logger.debug('Received chunk from server:', obj);
-						if (obj.chunk) {
-							if (!startedBlueprintStream) {
-								sendMessage(createAIMessage('main', 'Blueprint is being generated...', true));
-								logger.info('Blueprint stream has started');
-								setIsBootstrapping(false);
-								setIsGeneratingBlueprint(true);
-								startedBlueprintStream = true;
-								updateStage('bootstrap', { status: 'completed' });
-								updateStage('blueprint', { status: 'active' });
-							}
-							parser.feed(obj.chunk);
-							try {
-								const partial = parser.finalize();
-								setBlueprint(partial);
-							} catch (e) {
-								logger.error('Error parsing JSON:', e, obj.chunk);
-							}
-						}
-						if (obj.agentId) {
-							result.agentId = obj.agentId;
-						}
-						if (obj.websocketUrl) {
-							result.websocketUrl = obj.websocketUrl;
-							logger.debug('📡 Received WebSocket URL from server:', result.websocketUrl)
-						}
-						if (obj.behaviorType) {
-							result.behaviorType = obj.behaviorType;
-							setBehaviorType(obj.behaviorType);
-							logger.debug('Received behaviorType from server:', obj.behaviorType);
-						}
-						if (obj.projectType) {
-							result.projectType = obj.projectType;
-							logger.debug('Received projectType from server:', obj.projectType);
-						}
-						if (obj.template) {
-                            logger.debug('Received template from server:', obj.template);
-							result.template = obj.template;
-							if (obj.template.files) {
-								loadBootstrapFiles(obj.template.files);
-							}
-						}
+					// Start new code generation using API client. The bootstrap
+					// payload only carries the Realtime channel + token; blueprint,
+					// template files, and phases arrive as channel messages handled
+					// by the (unchanged) WebSocket message dispatcher.
+					const bootstrap = await apiClient.createAgentSession({
+						query: userQuery,
+						projectType,
+						behaviorType: explicitBehaviorType,
+						images: userImages, // Pass images from URL params for multi-modal blueprint
+					});
+
+					setIsBootstrapping(false);
+					setChatId(bootstrap.agentId);
+					if (bootstrap.previewUrl) {
+						setPreviewUrl(bootstrap.previewUrl);
 					}
 
-					updateStage('blueprint', { status: 'completed' });
-					setIsGeneratingBlueprint(false);
-					const finalBehaviorType = getBehaviorTypeForProject(projectType);
-					if (finalBehaviorType === 'phasic') {
-						sendMessage(
-							createAIMessage('main', 'Blueprint generation complete. Now starting the code generation...', true),
-						);
-					}
+					logger.debug('connecting to realtime channel for new session');
+					await connectChannel(bootstrap.realtimeChannel, bootstrap.token);
 
-					if (!result.websocketUrl || !result.agentId) {
-						throw new Error('Failed to initialize agent session');
-					}
-
-					// Connect to WebSocket
-					logger.debug('connecting to ws with created id');
-					connectWithRetry(result.websocketUrl);
-					setChatId(result.agentId); // This comes from the server response
-					
 					// Emit app-created event for sidebar updates
-					appEvents.emitAppCreated(result.agentId, {
+					appEvents.emitAppCreated(bootstrap.agentId, {
 						title: userQuery || 'New App',
 						description: userQuery,
 					});
@@ -632,18 +470,17 @@ export function useChat({
 						throw new Error(response.error?.message || 'Failed to connect to agent');
 					}
 
-					logger.debug('Existing agentId API result', response.data);
+					logger.debug('Existing agent bootstrap API result', response.data);
 					// Set the chatId for existing chat - this enables the chat input
 					setChatId(urlChatId);
 
-
-					if (!response.data.websocketUrl) {
-						throw new Error('Missing websocketUrl for existing agent');
+					if (response.data.previewUrl) {
+						setPreviewUrl(response.data.previewUrl);
 					}
 
 					logger.debug('connecting from init for existing chatId');
-					connectWithRetry(response.data.websocketUrl, {
-						disableGenerate: true, // We'll handle generation resume in the WebSocket open handler
+					await connectChannel(response.data.realtimeChannel, response.data.token, {
+						disableGenerate: true, // We'll handle generation resume once state is restored
 					});
 				}
 			} catch (error) {
@@ -660,11 +497,9 @@ export function useChat({
 	}, [
 		projectType,
 		explicitBehaviorType,
-		connectWithRetry,
-		loadBootstrapFiles,
+		connectChannel,
 		onDebugMessage,
 		sendMessage,
-		updateStage,
 		urlChatId,
 		userImages,
 		userQuery,
@@ -672,13 +507,14 @@ export function useChat({
 		startTrigger,
 	]);
 
-    // Mount/unmount: enable/disable reconnection and clear pending retries
+    // Mount/unmount: enable/disable reaction to realtime channel status
+    // events, and tear down the channel + any pending deployment timeout.
     useEffect(() => {
         shouldReconnectRef.current = true;
         return () => {
             shouldReconnectRef.current = false;
-            retryTimeouts.current.forEach(clearTimeout);
-            retryTimeouts.current = [];
+            channelRef.current?.unsubscribe();
+            channelRef.current = null;
             // Clear deployment timeout on unmount
             if (deploymentTimeoutRef.current) {
                 clearTimeout(deploymentTimeoutRef.current);
@@ -686,13 +522,6 @@ export function useChat({
             }
         };
     }, []);
-
-    // Close previous websocket on change
-    useEffect(() => {
-        return () => {
-            websocket?.close();
-        };
-    }, [websocket]);
 
 	useEffect(() => {
 		if (edit) {

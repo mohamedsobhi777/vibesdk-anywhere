@@ -34,9 +34,9 @@ export class ModelProvidersService extends BaseService {
                     eq(schema.userModelProviders.name, name)
                 )
             )
-            .get();
-        
-        return !!existing;
+            .limit(1);
+
+        return existing.length > 0;
     }
 
     /**
@@ -49,7 +49,7 @@ export class ModelProvidersService extends BaseService {
             userId,
             name: data.name,
             baseUrl: data.baseUrl,
-            secretId: data.secretId,
+            apiKeyEncrypted: data.secretId,
             isActive: true,
             createdAt: new Date(),
             updatedAt: new Date()
@@ -70,15 +70,14 @@ export class ModelProvidersService extends BaseService {
         return await this.database
             .select()
             .from(schema.userModelProviders)
-            .where(eq(schema.userModelProviders.userId, userId))
-            .all();
+            .where(eq(schema.userModelProviders.userId, userId));
     }
 
     /**
      * Get a specific provider by ID
      */
     async getProvider(userId: string, providerId: string): Promise<schema.UserModelProvider | null> {
-        const provider = await this.database
+        const rows = await this.database
             .select()
             .from(schema.userModelProviders)
             .where(
@@ -87,16 +86,16 @@ export class ModelProvidersService extends BaseService {
                     eq(schema.userModelProviders.userId, userId)
                 )
             )
-            .get();
+            .limit(1);
 
-        return provider || null;
+        return rows[0] || null;
     }
 
     /**
      * Get a provider by name
      */
     async getProviderByName(userId: string, name: string): Promise<schema.UserModelProvider | null> {
-        const provider = await this.database
+        const rows = await this.database
             .select()
             .from(schema.userModelProviders)
             .where(
@@ -105,9 +104,9 @@ export class ModelProvidersService extends BaseService {
                     eq(schema.userModelProviders.name, name)
                 )
             )
-            .get();
+            .limit(1);
 
-        return provider || null;
+        return rows[0] || null;
     }
 
     /**
@@ -118,10 +117,14 @@ export class ModelProvidersService extends BaseService {
         providerId: string, 
         data: UpdateProviderData
     ): Promise<schema.UserModelProvider | null> {
+        const { secretId, ...rest } = data;
         const updateData: Partial<typeof schema.userModelProviders.$inferInsert> = {
-            ...data,
+            ...rest,
             updatedAt: new Date()
         };
+        if (secretId !== undefined) {
+            updateData.apiKeyEncrypted = secretId;
+        }
 
         const [updated] = await this.database
             .update(schema.userModelProviders)
@@ -175,9 +178,8 @@ export class ModelProvidersService extends BaseService {
         const result = await this.database
             .select({ count: sql<number>`count(*)` })
             .from(schema.userModelProviders)
-            .where(eq(schema.userModelProviders.userId, userId))
-            .get();
+            .where(eq(schema.userModelProviders.userId, userId));
 
-        return result?.count || 0;
+        return result[0]?.count || 0;
     }
 }

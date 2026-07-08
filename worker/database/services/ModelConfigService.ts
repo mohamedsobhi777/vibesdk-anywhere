@@ -311,14 +311,15 @@ export class ModelConfigService extends BaseService {
 	 * Delete/reset a user model configuration (revert to default)
 	 */
 	async deleteUserModelConfig(userId: string, agentActionName: AgentActionKey): Promise<boolean> {
-		const result = await this.database
+		const deleted = await this.database
 			.delete(userModelConfigs)
 			.where(and(
 				eq(userModelConfigs.userId, userId),
 				eq(userModelConfigs.agentActionName, agentActionName)
-			));
+			))
+			.returning({ id: userModelConfigs.id });
 
-		return (result.meta?.changes || 0) > 0;
+		return deleted.length > 0;
 	}
 
 	/**
@@ -332,10 +333,11 @@ export class ModelConfigService extends BaseService {
 	 * Reset all user configurations to defaults
 	 */
 	async resetAllUserConfigs(userId: string): Promise<number> {
-		const result = await this.database
+		const deleted = await this.database
 			.delete(userModelConfigs)
-			.where(eq(userModelConfigs.userId, userId));
+			.where(eq(userModelConfigs.userId, userId))
+			.returning({ id: userModelConfigs.id });
 
-		return result.meta?.changes || 0;
+		return deleted.length;
 	}
 }

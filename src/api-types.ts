@@ -138,6 +138,7 @@ export type {
 
 // Agent/CodeGen API Types
 export type {
+  AgentBootstrapResponse,
   AgentConnectionData,
 } from 'worker/api/controllers/agent/types';
 

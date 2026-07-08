@@ -27,3 +27,17 @@ export interface AgentConnectionData {
 }
 
 export type AgentPreviewResponse = PreviewType;
+
+/**
+ * Bootstrap payload returned by `POST /api/agent`: the app + agent session
+ * have been created and the Superserve agent sandbox is booting/booted. The
+ * browser uses `token` to join the private `realtimeChannel` over Supabase
+ * Realtime.
+ */
+export interface AgentBootstrapResponse {
+    agentId: string;
+    sessionId: string;
+    realtimeChannel: string; // === `session:${sessionId}`
+    previewUrl: string | null;
+    token: string; // session-scoped Supabase JWT; the browser uses it to join the private channel
+}

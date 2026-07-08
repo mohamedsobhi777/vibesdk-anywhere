@@ -6,7 +6,6 @@ import { RateLimitService } from './rateLimits';
 import { getUserConfigurableSettings } from '../../config';
 import { canProceedWithRequest, type CanProceedResult } from 'shared/constants/limits';
 import { decryptTokens, encryptTokens, type EncryptedTokenData } from '../../utils/tokenEncryption';
-import { CloudflareAccountService } from '../cloudflare/CloudflareAccountService';
 import { readTokenCookie, buildTokenCookie, buildClearTokenCookie } from '../../utils/oauthCookie';
 import { CloudflareConnectOAuthProvider } from '../oauth/cloudflare-connect';
 import { createLogger } from '../../logger';
@@ -15,9 +14,6 @@ const logger = createLogger('UsageChecker');
 
 /** Refresh the access token this many ms before it expires. */
 const REFRESH_THRESHOLD_MS = 5 * 60 * 1000;
-
-/** How many minutes to consider cached gateway credits fresh before re-fetching. */
-const CREDITS_CACHE_TTL_MINUTES = 5;
 
 export type LimitWindowKind = 'daily' | 'rolling';
 
@@ -109,13 +105,11 @@ export async function checkUsageAndBalance(
 	// Any successful refresh produces a Set-Cookie the caller must attach.
 	let refreshedCookie: string | undefined;
 	let refreshedBlob: string | undefined;
-	let activeAccessToken: string | null = null;
 	let hasUserToken = false;
 
 	if (initialBlob) {
 		const resolved = await resolveAccessToken(env, userId, initialBlob, request, originUrl);
 		if (resolved.accessToken) {
-			activeAccessToken = resolved.accessToken;
 			hasUserToken = true;
 			if (resolved.refreshedBlob) {
 				refreshedBlob = resolved.refreshedBlob;
@@ -128,11 +122,14 @@ export async function checkUsageAndBalance(
 		}
 	}
 
-	// Get Cloudflare balance if user has a usable access token
-	let cloudflareBalance: number | null = null;
-	if (activeAccessToken) {
-		cloudflareBalance = await getCloudflareBalance(env, userId, activeAccessToken);
-	}
+	// Cloudflare account/gateway store is deferred in phase 2a
+	// (CloudflareAccountService and its cloudflareAccounts/aiGateways tables
+	// were retired - BYOK via Cloudflare AI Gateway is re-evaluated under a
+	// direct-SDK integration later), so a decrypted access token can no
+	// longer be resolved to a gateway balance. The token is still resolved
+	// above (and transparently refreshed) purely to compute `hasUserToken`
+	// for `canProceedWithRequest` below.
+	const cloudflareBalance: number | null = null;
 
 	// If the user has connected Cloudflare AND the LLM config excludes connected users, bypass limits entirely.
 	const hasCfConnected = await hasCloudflareConfigured(env, userId);
@@ -246,93 +243,26 @@ async function resolveAccessToken(
 }
 
 /**
- * Get Cloudflare AI Gateway balance for a user
- */
-async function getCloudflareBalance(env: Env, userId: string, token: string): Promise<number | null> {
-	try {
-		const accountService = new CloudflareAccountService(env);
-		const selected = await accountService.getSelectedGatewayWithAccount(userId);
-
-		if (!selected) return null;
-
-		// Check if cached credits are recent (less than 5 minutes old)
-		const now = new Date();
-		const lastUpdated = selected.gateway.creditsLastUpdated
-			? new Date(selected.gateway.creditsLastUpdated)
-			: null;
-		const cacheAgeMinutes = lastUpdated
-			? (now.getTime() - lastUpdated.getTime()) / (1000 * 60)
-			: Infinity;
-
-		if (cacheAgeMinutes < CREDITS_CACHE_TTL_MINUTES && selected.gateway.creditsRemaining !== null) {
-			return selected.gateway.creditsRemaining;
-		}
-
-		// Fetch fresh credits from Cloudflare. `null` means the credits API
-		// call failed (e.g. upstream outage, non-OK response, parse error).
-		const credits = await accountService.fetchGatewayCredits(
-			token,
-			selected.account.accountId,
-			selected.gateway.gatewayId
-		);
-
-		if (credits === null) {
-			// Don't overwrite the cached value with an unknown reading; fall
-			// back to the last-known balance so an outage doesn't masquerade
-			// as a $0 balance.
-			return selected.gateway.creditsRemaining ?? null;
-		}
-
-		// Update cached credits (fire and forget)
-		accountService.saveGateway(
-			userId,
-			selected.account.id,
-			selected.gateway.gatewayId,
-			selected.gateway.gatewayName,
-			selected.gateway.gatewaySlug,
-			selected.gateway.autoCreated || false,
-			credits
-		).catch(err => logger.error('Failed to update cached credits', err));
-
-		return credits;
-	} catch (error) {
-		logger.error('Error fetching Cloudflare balance', error);
-		return null;
-	}
-}
-
-/**
- * Get user's selected AI Gateway for BYOK mode
+ * Get user's selected AI Gateway for BYOK mode.
+ *
+ * Deferred in phase 2a: `CloudflareAccountService` and the
+ * cloudflareAccounts/aiGateways tables it read were retired (dropped in the
+ * lean 7-table Postgres schema rewrite) - Cloudflare AI Gateway BYOK is
+ * re-evaluated under a direct-SDK integration later. Always unconfigured
+ * until then.
  */
 export async function getUserGateway(
-	env: Env,
-	userId: string
+	_env: Env,
+	_userId: string
 ): Promise<{ accountId: string; gatewaySlug: string } | null> {
-	try {
-		const accountService = new CloudflareAccountService(env);
-		const selected = await accountService.getSelectedGatewayWithAccount(userId);
-
-		if (!selected) return null;
-
-		return {
-			accountId: selected.account.accountId,
-			gatewaySlug: selected.gateway.gatewaySlug,
-		};
-	} catch (error) {
-		logger.error('Error fetching user gateway', error);
-		return null;
-	}
+	return null;
 }
 
 /**
- * Check if user has configured Cloudflare account and gateway
+ * Check if user has configured Cloudflare account and gateway.
+ *
+ * Deferred in phase 2a - see `getUserGateway` doc above.
  */
-export async function hasCloudflareConfigured(env: Env, userId: string): Promise<boolean> {
-	try {
-		const accountService = new CloudflareAccountService(env);
-		const selection = await accountService.getUserSelection(userId);
-		return !!(selection.accountId && selection.gatewayId);
-	} catch {
-		return false;
-	}
+export async function hasCloudflareConfigured(_env: Env, _userId: string): Promise<boolean> {
+	return false;
 }

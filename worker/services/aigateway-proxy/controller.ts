@@ -1,6 +1,6 @@
 import { getConfigurationForModel } from '../../agents/inferutils/core';
 import { eq } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/d1';
+import { createDatabaseService } from '../../database';
 import { apps } from '../../database/schema';
 import { jwtVerify, SignJWT } from 'jose';
 import { isDev } from 'worker/utils/envs';
@@ -91,8 +91,8 @@ export async function proxyToAiGateway(request: Request, env: Env, _ctx: Executi
             });
         }
 
-        const db = drizzle(env.DB);
-        const app = await db.select({
+        const db = createDatabaseService(env).db;
+        const appRows = await db.select({
             id: apps.id,
             userId: apps.userId,
             title: apps.title,
@@ -100,7 +100,8 @@ export async function proxyToAiGateway(request: Request, env: Env, _ctx: Executi
         })
         .from(apps)
         .where(eq(apps.id, appId))
-        .get();
+        .limit(1);
+        const app = appRows[0];
 
         if (!app) {
             return new Response(JSON.stringify({ 

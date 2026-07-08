@@ -2,25 +2,9 @@
  * Centralized Authentication Utilities
  */
 
-import type {  AuthUser } from '../types/auth-types';
-import type { User } from '../database/schema';
 import { createLogger } from '../logger';
 
 const logger = createLogger('AuthUtils');
-
-/**
- * Extract sessionId from cookie
-*/
-export function extractSessionId(request: Request): string | null {
-    const cookieHeader = request.headers.get('Cookie');
-       if (!cookieHeader) {
-               return null;
-       }
-
-       const cookies = parseCookies(cookieHeader);
-       return cookies['sessionId'];
-}
-
 
 /**
  * Token extraction priorities and methods
@@ -38,15 +22,6 @@ export interface TokenExtractionResult {
 	token: string | null;
 	method?: TokenExtractionMethod;
 	cookieName?: string;
-}
-
-/**
- * Extract JWT token from request with multiple fallback methods
- * Prioritizes Authorization header, then cookies, then query parameters
- */
-export function extractToken(request: Request): string | null {
-	const result = extractTokenWithMetadata(request);
-	return result.token;
 }
 
 /**
@@ -118,25 +93,6 @@ export function parseCookies(cookieHeader: string): Record<string, string> {
 }
 
 /**
- * Clear authentication cookie using secure cookie options
- */
-export function clearAuthCookie(name: string): string {
-	return createSecureCookie({
-		name,
-		value: '',
-		maxAge: 0,
-	});
-}
-
-/**
- * Clear all auth cookies from response using consolidated approach
- */
-export function clearAuthCookies(response: Response): void {
-	response.headers.append('Set-Cookie', clearAuthCookie('accessToken'));
-	response.headers.append('Set-Cookie', clearAuthCookie('auth_token'));
-}
-
-/**
  * Enhanced cookie creation with security options
  */
 export interface CookieOptions {
@@ -175,33 +131,6 @@ export function createSecureCookie(options: CookieOptions): string {
     parts.push('HttpOnly');
 
 	return parts.join('; ');
-}
-
-/**
- * Set auth cookies with proper security settings
- */
-export function setSecureAuthCookies(
-	response: Response,
-	tokens: {
-		accessToken: string;
-		accessTokenExpiry?: number; // seconds
-	},
-): void {
-	const {
-		accessToken,
-		accessTokenExpiry = 3 * 24 * 60 * 60, // 3 days
-	} = tokens;
-
-	// Set access token cookie
-	response.headers.append(
-		'Set-Cookie',
-		createSecureCookie({
-			name: 'accessToken',
-			value: accessToken,
-			maxAge: accessTokenExpiry,
-			sameSite: 'Lax',
-		}),
-	);
 }
 
 /**
@@ -247,48 +176,6 @@ export function extractRequestMetadata(request: Request): RequestMetadata {
 }
 
 /**
- * Create session response
- */
-export interface SessionResponse {
-	user: AuthUser;
-    sessionId: string;
-    expiresAt: Date | null;
-}
-
-export function mapUserResponse(
-	user: (Partial<User> & { id: string; email: string }) | AuthUser,
-): AuthUser {
-	// Handle AuthUser type - already in correct format
-	if ('isAnonymous' in user) {
-		return user as AuthUser;
-	}
-
-	// Map from User schema type
-	return {
-		id: user.id,
-		email: user.email,
-		displayName: user.displayName || undefined,
-		username: user.username || undefined,
-		avatarUrl: user.avatarUrl || undefined,
-		bio: user.bio || undefined,
-		timezone: user.timezone || undefined,
-		provider: user.provider || undefined,
-		emailVerified: user.emailVerified || undefined,
-		createdAt: user.createdAt || undefined,
-	};
-}
-
-export function formatAuthResponse(
-	user: AuthUser,
-	sessionId: string,
-	expiresAt: Date | null,
-): SessionResponse {
-	const response: SessionResponse = { user, sessionId, expiresAt };
-    
-	return response;
-}
-
-/**
  * Validate and sanitize redirect URL to prevent open redirect attacks
  * Returns null if the URL is invalid or potentially malicious
  */
@@ -324,4 +211,3 @@ export function validateRedirectUrl(redirectUrl: string, request: Request): stri
 		return null;
 	}
 }
-

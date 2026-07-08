@@ -1,7 +1,5 @@
-import { setupAuthRoutes } from './authRoutes';
 import { setupAppRoutes } from './appRoutes';
 import { setupUserRoutes } from './userRoutes';
-import { setupStatsRoutes } from './statsRoutes';
 import { setupAnalyticsRoutes } from './analyticsRoutes';
 // import { setupUserSecretsRoutes } from './userSecretsRoutes';
 import { setupModelConfigRoutes } from './modelConfigRoutes';
@@ -12,8 +10,6 @@ import { setupScreenshotRoutes } from './imagesRoutes';
 import { setupSentryRoutes } from './sentryRoutes';
 import { setupCapabilitiesRoutes } from './capabilitiesRoutes';
 import { setupTicketRoutes } from './ticketRoutes';
-import { setupCloudflareConnectRoutes } from './cloudflareConnectRoutes';
-import { setupCloudflareAccountRoutes } from './cloudflareAccountRoutes';
 import { setupLimitsRoutes } from './limitsRoutes';
 import { Hono } from "hono";
 import { AppEnv } from "../../types/appenv";
@@ -23,8 +19,8 @@ export function setupRoutes(app: Hono<AppEnv>): void {
     // Health check route
     app.get('/api/health', (c) => {
         return c.json({ status: 'ok' });
-    }); 
-    
+    });
+
     // Sentry tunnel routes (public - no auth required)
     setupSentryRoutes(app);
 
@@ -34,40 +30,40 @@ export function setupRoutes(app: Hono<AppEnv>): void {
     // Platform capabilities routes (public)
     setupCapabilitiesRoutes(app);
 
-    // Authentication and user management routes
-    setupAuthRoutes(app);
-    // Cloudflare "Connect" OAuth routes (for per-user AI Gateway tokens)
-    setupCloudflareConnectRoutes(app);
-    // Cloudflare account and gateway management routes
-    setupCloudflareAccountRoutes(app);
-    
+    // Authentication is handled client-side by Supabase Auth as of phase 2a;
+    // the hand-rolled register/login/OAuth/session/API-key routes that used
+    // to live here were retired along with AuthService/SessionService/
+    // ApiKeyService. Cloudflare "Connect" OAuth and account/gateway
+    // management routes were retired with CloudflareAccountService (the
+    // cloudflareAccounts/aiGateways tables are deferred).
+
     // WebSocket ticket routes
     setupTicketRoutes(app);
-    
+
     // Codegen routes
     setupCodegenRoutes(app);
-    
+
     // User dashboard and profile routes
     setupUserRoutes(app);
-    
+
     // App management routes
     setupAppRoutes(app);
-    
-    // Stats routes
-    setupStatsRoutes(app);
-    
+
+    // Stats routes were retired with AnalyticsService (depends on the
+    // deferred favorites/appViews/appLikes tables).
+
     // AI Gateway Analytics routes
     setupAnalyticsRoutes(app);
-    
+
     // // Secrets management routes (legacy D1-based)
     // setupSecretsRoutes(app);
 
     // // User secrets vault routes
     // setupUserSecretsRoutes(app);
-    
+
     // Model configuration and provider keys routes
     setupModelConfigRoutes(app);
-    
+
     // Model provider routes
     setupModelProviderRoutes(app);
 

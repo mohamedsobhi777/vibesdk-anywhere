@@ -5,8 +5,7 @@
 
 import { BaseController } from '../baseController';
 import { RouteContext } from '../../types/route-context';
-import { checkUsageAndBalance, isCloudflareGatewayLimitsEnabled } from '../../../services/rate-limit';
-import { CloudflareAccountService } from '../../../services/cloudflare/CloudflareAccountService';
+import { checkUsageAndBalance, hasCloudflareConfigured, isCloudflareGatewayLimitsEnabled } from '../../../services/rate-limit';
 import { createLogger } from '../../../logger';
 
 export class LimitsController extends BaseController {
@@ -29,12 +28,12 @@ export class LimitsController extends BaseController {
 
 		try {
 			// Token is read from the HttpOnly cookie inside checkUsageAndBalance.
-			const accountService = new CloudflareAccountService(env);
-			const [usageResult, selectedGateway] = await Promise.all([
+			// Cloudflare account/gateway selection is deferred in phase 2a (see
+			// `hasCloudflareConfigured` doc) - always unconfigured until then.
+			const [usageResult, hasCfConfigured] = await Promise.all([
 				checkUsageAndBalance(env, user.id, request),
-				accountService.getSelectedGatewayWithAccount(user.id),
+				hasCloudflareConfigured(env, user.id),
 			]);
-			const hasCfConfigured = !!selectedGateway;
 
 			const window = usageResult.windowKind ?? 'rolling';
 			const unlimited = !Number.isFinite(usageResult.limit);
@@ -81,11 +80,6 @@ export class LimitsController extends BaseController {
 				cloudflareCredits: usageResult.balance !== null ? {
 					credits: usageResult.balance,
 					currency: 'USD',
-					...(selectedGateway ? {
-						accountId: selectedGateway.account.accountId,
-						gatewayName: selectedGateway.gateway.gatewayName,
-						accountName: selectedGateway.account.accountName,
-					} : {}),
 				} : null,
 			});
 			if (usageResult.refreshedCookie) {

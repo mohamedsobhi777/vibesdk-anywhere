@@ -2,7 +2,6 @@ import { jwtVerify, SignJWT } from 'jose';
 import { TokenPayload } from '../types/auth-types';
 import { SecurityError, SecurityErrorType } from 'shared/types/errors';
 import { createLogger } from '../logger';
-import { SessionService } from 'worker/database/services/SessionService';
 
 const logger = createLogger('JWTUtils');
 
@@ -107,22 +106,6 @@ export class JWTUtils {
     }
 
     // -- Convenience methods --
-
-    async createAccessToken(userId: string, email: string, sessionId: string): Promise<{
-        accessToken: string;
-        expiresIn: number;
-    }> {
-        const accessTokenExpiry = SessionService.config.sessionTTL;
-
-        const payload = { sub: userId, email, sessionId };
-
-        const accessToken = await this.createToken({
-                ...payload,
-                type: 'access' as const,
-            }, accessTokenExpiry);
-
-        return { accessToken, expiresIn: accessTokenExpiry };
-    }
 
     async hashToken(token: string): Promise<string> {
         const encoder = new TextEncoder();

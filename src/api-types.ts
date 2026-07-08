@@ -2,8 +2,8 @@
  * Centralized API types - imports and re-exports types from worker
  * This file serves as the single source of truth for frontend-worker API communication
  */
-import { SessionResponse } from 'worker/utils/authUtils';
 import { AuthUser } from './api-types';
+import type { UserStats, UserActivity } from 'worker/database/types';
 
 export type { SecretTemplate } from 'worker/types/secretsTemplates';
 
@@ -48,10 +48,18 @@ export type {
 } from 'worker/api/controllers/user/types';
 
 // Stats API Types
-export type {
-  UserStatsData,
-  UserActivityData
-} from 'worker/api/controllers/stats/types';
+//
+// Locally defined: `worker/api/controllers/stats/types.ts` was retired
+// along with `StatsController`/`AnalyticsService` in phase 2a (the
+// dashboard stats they served depend on tables - favorites/appViews/
+// appLikes - dropped in the lean Postgres schema rewrite). `UserStats`/
+// `UserActivity` themselves are unaffected (re-exported below from
+// `worker/database/types`) - only the controller response wrapper types
+// move here.
+export type UserStatsData = UserStats;
+export interface UserActivityData {
+  activities: UserActivity[];
+}
 
 // Analytics API Types
 export type {
@@ -250,16 +258,33 @@ export {
 } from 'worker/types/image-attachment';
 
 // Auth types imported from worker
-export type { 
-  AuthSession, 
-  ApiKeyInfo, 
-  AuthResult, 
+export type {
   AuthUser,
-  OAuthProvider 
+  OAuthProvider
 } from 'worker/types/auth-types';
-export type { 
-  SessionResponse 
-} from 'worker/utils/authUtils';
+
+/**
+ * Session information for active authentication.
+ *
+ * Locally defined as of phase 2a: the hand-rolled session stack this used
+ * to mirror (`worker/types/auth-types.ts`'s old `AuthSession`,
+ * `worker/utils/authUtils.ts`'s old `SessionResponse`) was retired in favor
+ * of Supabase Auth sessions (see `worker/services/auth/supabaseAuth.ts`).
+ * Kept here, with the same shape, for the existing frontend auth context
+ * contract pending the phase 2b frontend auth migration.
+ */
+export interface AuthSession {
+  userId: string;
+  email: string;
+  sessionId: string;
+  expiresAt: Date | null;
+}
+
+export interface SessionResponse {
+  user: AuthUser;
+  sessionId: string;
+  expiresAt: Date | null;
+}
 
 // Auth API Response Types (using existing worker types)
 export type LoginResponseData = SessionResponse;

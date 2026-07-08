@@ -1,0 +1,14 @@
+{
+	"//": [
+		"vercel.json does not support comment syntax; this '//' key documents",
+		"required environment variables and is otherwise ignored by Vercel.",
+		"Set these in the Vercel project's environment variables, not here:",
+		"SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_DB_URL,",
+		"SUPABASE_SERVICE_ROLE_KEY, SUPABASE_JWT_SECRET, SUPERSERVE_API_KEY,",
+		"SUPERSERVE_AGENT_TEMPLATE, TEMPLATES_BASE_URL"
+	],
+	"rewrites": [
+		{ "source": "/api/(.*)", "destination": "/api" },
+		{ "source": "/(.*)", "destination": "/index.html" }
+	]
+}

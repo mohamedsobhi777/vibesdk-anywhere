@@ -45,6 +45,12 @@ export default defineWorkersConfig({
       '**/cf-git/**',
       '**/sdk/test/**', // SDK tests run with bun test, not vitest
       '**/agent-runtime/**',
+      // Proves createApp() is loadable under a genuine non-workerd runtime
+      // (Vercel/Node has no `cloudflare:workers`); this pool runs inside
+      // workerd, where that module always resolves, which would mask
+      // exactly the failure this test exists to catch. Runs via `bun test`
+      // instead - see the file header comment.
+      '**/test/worker/api/vercelHandler.test.ts',
       ...(runIntegrationTests ? [] : ['**/sdk/test/integration/**']),
     ],
   },

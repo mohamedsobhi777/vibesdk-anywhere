@@ -1,8 +1,6 @@
-import { getAgentByName } from 'agents';
 import { generateId } from '../utils/idGenerator';
 import { StructuredLogger } from '../logger';
 import { InferenceContext } from './inferutils/config.types';
-import { SandboxSdkClient } from '../services/sandbox/sandboxSdkClient';
 import { selectTemplate } from './planning/templateSelector';
 import { TemplateDetails } from '../services/sandbox/sandboxTypes';
 import { createScratchTemplateDetails } from './utils/templates';
@@ -10,7 +8,7 @@ import { TemplateSelection } from './schemas';
 import type { ImageAttachment } from '../types/image-attachment';
 import { BaseSandboxService } from 'worker/services/sandbox/BaseSandboxService';
 import { AgentState, CurrentDevState } from './core/state';
-import { CodeGeneratorAgent } from './core/codingAgent';
+import type { CodeGeneratorAgent } from './core/codingAgent';
 import { BehaviorType, ProjectType } from './core/types';
 
 type AgentStubProps = {
@@ -18,16 +16,30 @@ type AgentStubProps = {
     projectType?: ProjectType;
 };
 
+// `getAgentByName` (from the `agents` npm package) and `SandboxSdkClient`
+// (worker/services/sandbox/sandboxSdkClient.ts) both pull in Workers-only
+// `cloudflare:*` virtual modules at their own module scope. This barrel is
+// imported eagerly by many controllers/middleware that `createApp`'s route
+// registration loads unconditionally, so top-level static imports of either
+// would make `createApp` unloadable under a plain Node/Vercel runtime even
+// for requests that never reach an agent endpoint. Both are imported lazily
+// inside the functions that need them instead - the same idiom already used
+// for the sandbox SDK client in worker/services/sandbox/factory.ts.
+// `CodeGeneratorAgent` above is `import type` for the same reason: it is
+// only ever used here as a type argument, never a value.
+
 export async function getAgentStub(
-    env: Env, 
+    env: Env,
     agentId: string,
     props?: AgentStubProps
 ) : Promise<DurableObjectStub<CodeGeneratorAgent>> {
+    const { getAgentByName } = await import('agents');
     const options = props ? { props } : undefined;
     return getAgentByName<Env, CodeGeneratorAgent>(env.CodeGenObject, agentId, options);
 }
 
 export async function getAgentStubLightweight(env: Env, agentId: string) : Promise<DurableObjectStub<CodeGeneratorAgent>> {
+    const { getAgentByName } = await import('agents');
     return getAgentByName<Env, CodeGeneratorAgent>(env.CodeGenObject, agentId, {
         // props: { readOnlyMode: true }
     });
@@ -101,7 +113,8 @@ async function handleUserSelectedTemplate(
     logger: StructuredLogger
 ): Promise<TemplateQueryResult> {
     logger.info('Using user-specified template, bypassing AI selection', { selectedTemplate: templateName });
-    
+
+    const { SandboxSdkClient } = await import('../services/sandbox/sandboxSdkClient');
     const templatesResponse = await SandboxSdkClient.listTemplates();
     if (!templatesResponse?.success) {
         throw new Error(`Failed to fetch templates from sandbox service, ${templatesResponse.error}`);
@@ -136,6 +149,7 @@ async function handleUserSelectedTemplate(
 async function handleAITemplateSelection(args: Omit<TemplateQueryArgs, 'selectedTemplate'>): Promise<TemplateQueryResult> {
     const { env, inferenceContext, query, projectType, images, logger } = args;
 
+    const { SandboxSdkClient } = await import('../services/sandbox/sandboxSdkClient');
     const templatesResponse = await SandboxSdkClient.listTemplates();
     if (!templatesResponse?.success) {
         throw new Error(`Failed to fetch templates from sandbox service, ${templatesResponse.error}`);

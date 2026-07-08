@@ -7,9 +7,9 @@ import { createLogger } from '../../logger';
 import { SecurityError, SecurityErrorType } from 'shared/types/errors';
 import { generateSecureToken } from '../../utils/cryptoUtils';
 import { parseCookies, createSecureCookie } from '../../utils/authUtils';
-import { getCSRFConfig } from '../../config/security';
+import { CSRFConfig, getCSRFConfig } from '../../config/security';
 import { captureSecurityEvent } from '../../observability/sentry';
-import { env } from 'cloudflare:workers'
+import { getRuntimeEnv } from '../../utils/runtimeEnv';
 
 const logger = createLogger('CsrfService');
 
@@ -21,7 +21,15 @@ interface CSRFTokenData {
 export class CsrfService {
     static readonly COOKIE_NAME = 'csrf-token';
     static readonly HEADER_NAME = 'X-CSRF-Token';
-    static readonly defaults = getCSRFConfig(env)
+
+    // Computed lazily (not as an eager module-scope/class-field value) so
+    // loading this module never requires a `cloudflare:workers` runtime env
+    // to already exist - only actually calling into CsrfService does. See
+    // worker/utils/runtimeEnv.ts; createApp() populates the seam before any
+    // request reaches this middleware, on both Workers and Vercel/Node.
+    static get defaults(): CSRFConfig {
+        return getCSRFConfig(getRuntimeEnv());
+    }
     
     /**
      * Generate a cryptographically secure CSRF token

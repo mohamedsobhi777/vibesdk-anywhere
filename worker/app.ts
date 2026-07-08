@@ -9,9 +9,17 @@ import { CsrfService } from './services/csrf/CsrfService';
 import { SecurityError, SecurityErrorType } from 'shared/types/errors';
 import { getGlobalConfigurableSettings } from './config';
 import { AuthConfig, setAuthLevel } from './middleware/auth/routeAuth';
+import { setRuntimeEnv } from './utils/runtimeEnv';
 // import { initHonoSentry } from './observability/sentry';
 
 export function createApp(env: Env): Hono<AppEnv> {
+    // Populate the process-global runtime-env seam (worker/utils/runtimeEnv.ts)
+    // before any middleware or route touches it. On Workers this mirrors what
+    // worker/index.ts already does at bootstrap from `cloudflare:workers`; on
+    // Vercel/Node (no `cloudflare:workers`) this is the only place it happens,
+    // since createApp() is the sole entrypoint on that path.
+    setRuntimeEnv(env);
+
     const app = new Hono<AppEnv>();
 
     // Observability: Sentry error reporting & context
@@ -99,7 +107,18 @@ export function createApp(env: Env): Hono<AppEnv> {
     // Add not found route to redirect to ASSETS
     // Wrap the ASSETS response in a new Response with mutable headers so
     // downstream middleware (e.g. secureHeaders) can safely modify them.
+    // On Vercel/Node there is no ASSETS binding - the SPA is served by
+    // Vercel's static file handling (see vercel.json's rewrites), not this
+    // app, so a request that reaches here has genuinely matched nothing;
+    // return a plain 404 instead of dereferencing the absent binding.
     app.notFound(async (c) => {
+        if (!c.env.ASSETS) {
+            const pathname = new URL(c.req.url).pathname;
+            if (pathname.startsWith('/api/')) {
+                return c.json({ error: { message: 'Not Found' } }, 404);
+            }
+            return c.text('Not Found', 404);
+        }
         const res = await c.env.ASSETS.fetch(c.req.raw);
         return new Response(res.body, {
             status: res.status,

@@ -5,7 +5,15 @@
 
 import { BaseController } from '../baseController';
 import { RouteContext } from '../../types/route-context';
-import { checkUsageAndBalance, hasCloudflareConfigured, isCloudflareGatewayLimitsEnabled } from '../../../services/rate-limit';
+// Imported from the concrete module rather than the `services/rate-limit`
+// barrel: the barrel also re-exports `DORateLimitStore` (a real, non-type
+// export whose module does `class ... extends DurableObject` from
+// 'cloudflare:workers' at module scope), which would force that module to
+// load under any runtime - including createApp() under Vercel/Node, where
+// 'cloudflare:workers' is unresolvable - even though this file only ever
+// needs the usage-checker helpers. See worker/agents/core/websocket.ts for
+// the same idiom.
+import { checkUsageAndBalance, hasCloudflareConfigured, isCloudflareGatewayLimitsEnabled } from '../../../services/rate-limit/usageChecker';
 import { createLogger } from '../../../logger';
 
 export class LimitsController extends BaseController {

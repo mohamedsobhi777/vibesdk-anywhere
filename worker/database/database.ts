@@ -14,12 +14,13 @@ import { buildDrizzle } from './pgConnection';
 // ========================================
 
 export type {
-    User, NewUser, Session, NewSession,
+    User, NewUser,
     App, NewApp,
-    AppLike, NewAppLike, AppComment, NewAppComment,
-    AppView, NewAppView, OAuthState, NewOAuthState,
-    SystemSetting, NewSystemSetting,
     UserModelConfig, NewUserModelConfig,
+    UserModelProvider, NewUserModelProvider,
+    UserSecret, NewUserSecret,
+    RateLimitBucket, NewRateLimitBucket,
+    SystemSetting, NewSystemSetting,
 } from './schema';
 
 

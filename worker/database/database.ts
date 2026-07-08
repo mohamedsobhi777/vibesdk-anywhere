@@ -1,16 +1,13 @@
 /**
  * Core Database Service
- * Provides database connection, core utilities, and base operations∂ƒ
+ * Provides database connection, core utilities, and base operations
  */
 
-import { drizzle } from 'drizzle-orm/d1';
-import * as Sentry from '@sentry/cloudflare';
 import * as schema from './schema';
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
 import type { HealthStatusResult } from './types';
-import { isStandaloneRuntime } from '../utils/runtimeMode';
-import { createNoopD1Database } from './noopD1';
+import { buildDrizzle } from './pgConnection';
 
 // ========================================
 // TYPE DEFINITIONS AND INTERFACES
@@ -33,45 +30,25 @@ export type {
  * Domain-specific operations are handled by dedicated service classes.
  */
 export class DatabaseService {
-    public readonly db: DrizzleD1Database<typeof schema>;
-    private readonly d1: D1Database;
-    private readonly enableReplicas: boolean;
+    public readonly db: PostgresJsDatabase<typeof schema>;
 
     constructor(env: Env) {
-        // Standalone agent runtime has no D1 binding: env.DB is a poisoned
-        // proxy (agent-runtime/src/envAdapter.ts) that throws on ANY property
-        // access, including Sentry's instrumentation reading `db.prepare` to
-        // wrap it. Substitute a genuine no-op D1Database instead of touching
-        // the poisoned binding at all — writes no-op successfully, reads
-        // return empty results. Workers env never carries this sentinel, so
-        // this branch never runs there and instrumentation is unchanged.
-        const instrumented = isStandaloneRuntime(env)
-            ? createNoopD1Database()
-            : Sentry.instrumentD1WithSentry(env.DB);
-        this.d1 = instrumented;
-        this.db = drizzle(instrumented, { schema });
-        this.enableReplicas = env.ENABLE_READ_REPLICAS === 'true';
+        // Standalone agent runtime -> no-op Postgres client (never opens a
+        // real connection); Workers runtime -> real postgres-js client
+        // against Supabase. See `buildDrizzle` / `isStandaloneRuntime`.
+        this.db = buildDrizzle(env);
     }
 
     /**
-     * Get a read-optimized database connection using D1 Sessions API
-     * This routes queries to read replicas for lower global latency
-     * 
-     * @param strategy - Session strategy:
-     *   - 'fast' (default): Routes to any replica for lowest latency
-     *   - 'fresh': Routes first query to primary for latest data
-     * @returns Drizzle database instance configured for read operations
+     * Returns the database connection.
+     *
+     * Retained for source compatibility with callers written against the
+     * D1 read-replica API (D1 Sessions API `'fast' | 'fresh'` strategies).
+     * Postgres over postgres-js has no equivalent read-replica session API,
+     * so both strategies now resolve to the single pooled connection.
      */
-    public getReadDb(strategy: 'fast' | 'fresh' = 'fast'): DrizzleD1Database<typeof schema> {
-        // Return regular db if replicas are disabled
-        if (!this.enableReplicas) {
-            return this.db;
-        }
-
-        const sessionType = strategy === 'fresh' ? 'first-primary' : 'first-unconstrained';
-        const session = this.d1.withSession(sessionType);
-        // D1DatabaseSession is compatible with D1Database for Drizzle operations
-        return drizzle(session as unknown as D1Database, { schema });
+    public getReadDb(_strategy: 'fast' | 'fresh' = 'fast'): PostgresJsDatabase<typeof schema> {
+        return this.db;
     }
 
     // ========================================

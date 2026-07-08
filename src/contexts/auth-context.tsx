@@ -1,11 +1,12 @@
 /**
  * Enhanced Auth Context
- * Provides OAuth + Email/Password authentication with backward compatibility
+ * Provides OAuth + Email/Password authentication via Supabase Auth
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router';
-import { apiClient, ApiError } from '@/lib/api-client';
+import { AuthError, type Session, type User } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
 import { useSentryUser } from '@/hooks/useSentryUser';
 import type { AuthSession, AuthUser } from '../api-types';
 
@@ -16,7 +17,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-  
+
   // Auth provider configuration
   authProviders: {
     google: boolean;
@@ -25,18 +26,18 @@ interface AuthContextType {
   } | null;
   hasOAuth: boolean;
   requiresEmailAuth: boolean;
-  
+
   // OAuth login method with redirect support
   login: (provider: 'google' | 'github', redirectUrl?: string) => void;
-  
+
   // Email/password login method
   loginWithEmail: (credentials: { email: string; password: string }) => Promise<void>;
   register: (data: { email: string; password: string; name?: string }) => Promise<void>;
-  
+
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   clearError: () => void;
-  
+
   // Redirect URL management
   setIntendedUrl: (url: string) => void;
   getIntendedUrl: () => string | null;
@@ -45,8 +46,59 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Token refresh interval - refresh every 10 minutes
-const TOKEN_REFRESH_INTERVAL = 60 * 60 * 1000; // 1 hour (check less frequently since tokens last 24h)
+// Supabase Auth is provisioned with Google, GitHub, and email/password
+// enabled for this app. The `/api/auth/providers` endpoint this used to be
+// fetched from is retired, so the config is static.
+const DEFAULT_AUTH_PROVIDERS: { google: boolean; github: boolean; email: boolean } = {
+  google: true,
+  github: true,
+  email: true,
+};
+
+function readMetadataString(metadata: Record<string, unknown>, key: string): string | undefined {
+  const value = metadata[key];
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+// Maps a Supabase `User` to this app's `AuthUser` shape.
+function mapUser(user: User | null): AuthUser | null {
+  if (!user) {
+    return null;
+  }
+
+  const metadata = user.user_metadata as Record<string, unknown>;
+
+  return {
+    id: user.id,
+    // OAuth (Google/GitHub) and email/password are the only sign-in methods
+    // this app supports, so Supabase always populates `email`; the fallback
+    // only satisfies `User.email`'s type-level optionality.
+    email: user.email ?? '',
+    displayName:
+      readMetadataString(metadata, 'display_name') ??
+      readMetadataString(metadata, 'name') ??
+      readMetadataString(metadata, 'full_name'),
+    avatarUrl: readMetadataString(metadata, 'avatar_url') ?? readMetadataString(metadata, 'picture'),
+    provider: user.app_metadata.provider,
+    emailVerified: Boolean(user.email_confirmed_at),
+    createdAt: new Date(user.created_at),
+    isAnonymous: false,
+  };
+}
+
+// Maps a Supabase `Session` to this app's `AuthSession` shape.
+function mapSession(session: Session | null): AuthSession | null {
+  if (!session) {
+    return null;
+  }
+
+  return {
+    userId: session.user.id,
+    email: session.user.email ?? '',
+    sessionId: session.user.id,
+    expiresAt: new Date((session.expires_at ?? 0) * 1000),
+  };
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -54,16 +106,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [authProviders, setAuthProviders] = useState<{ google: boolean; github: boolean; email: boolean; } | null>(null);
-  const [hasOAuth, setHasOAuth] = useState<boolean>(false);
-  const [requiresEmailAuth, setRequiresEmailAuth] = useState<boolean>(true);
   const navigate = useNavigate();
-  
+
   // Sync user context with Sentry for error tracking
   useSentryUser(user);
-  
-  // Ref to store the refresh timer
-  const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Redirect URL management
   const INTENDED_URL_KEY = 'auth_intended_url';
@@ -93,113 +139,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Bootstrap the current session on mount, then stay in sync with Supabase
+  // Auth for the lifetime of the provider (sign-in, sign-out, token refresh
+  // all flow through the same subscription).
+  useEffect(() => {
+    let isMounted = true;
 
-  // Fetch auth providers configuration
-  const fetchAuthProviders = useCallback(async () => {
-    try {
-      const response = await apiClient.getAuthProviders();
-      if (response.success && response.data) {
-        setAuthProviders(response.data.providers);
-        setHasOAuth(response.data.hasOAuth);
-        setRequiresEmailAuth(response.data.requiresEmailAuth);
+    const bootstrapSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!isMounted) {
+        return;
       }
-    } catch (error) {
-      console.warn('Failed to fetch auth providers:', error);
-      // Fallback to defaults
-      setAuthProviders({ google: false, github: false, email: true });
-      setHasOAuth(false);
-      setRequiresEmailAuth(true);
-    }
-  }, []);
-
-  // Setup automatic session validation (cookie-based)
-  const setupTokenRefresh = useCallback(() => {
-    // Clear any existing timer
-    if (refreshTimerRef.current) {
-      clearInterval(refreshTimerRef.current);
-    }
-
-    // Set up session validation timer - less frequent since cookies handle refresh
-    refreshTimerRef.current = setInterval(async () => {
-      try {
-        const response = await apiClient.getProfile(true);
-
-        if (!response.success) {
-          // Session invalid, user needs to login again
-          setUser(null);
-          setToken(null);
-          setSession(null);
-          clearInterval(refreshTimerRef.current!);
-        }
-      } catch (error) {
-        console.error('Session validation failed:', error);
-      }
-    }, TOKEN_REFRESH_INTERVAL);
-  }, []);
-
-  // Check authentication status
-  const checkAuth = useCallback(async () => {
-    try {
-      const response = await apiClient.getProfile(true);
-      
-      if (response.success && response.data?.user) {
-        const userData = { ...response.data.user, isAnonymous: false } as AuthUser;
-        setUser(userData);
-        setToken(null); // Profile endpoint doesn't return token, cookies are used
-        setSession({
-          userId: response.data.user.id,
-          email: response.data.user.email,
-          sessionId: response.data.sessionId || response.data.user.id,
-          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours expiry
-        });
-
-        // Setup token refresh
-        setupTokenRefresh();
-      } else {
-        setUser(null);
-        setToken(null);
-        setSession(null);
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error);
-      setUser(null);
-      setToken(null);
-      setSession(null);
-    } finally {
+      setUser(mapUser(session?.user ?? null));
+      setToken(session?.access_token ?? null);
+      setSession(mapSession(session));
       setIsLoading(false);
-    }
-  }, [setupTokenRefresh]);
+    };
 
-  // Cleanup refresh timer on unmount
-  useEffect(() => {
+    void bootstrapSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(mapUser(session?.user ?? null));
+      setToken(session?.access_token ?? null);
+      setSession(mapSession(session));
+    });
+
     return () => {
-      if (refreshTimerRef.current) {
-        clearInterval(refreshTimerRef.current);
-      }
+      isMounted = false;
+      subscription.unsubscribe();
     };
   }, []);
-
-  // Initialize auth state on mount
-  useEffect(() => {
-    const initAuth = async () => {
-      await fetchAuthProviders();
-      await checkAuth();
-    };
-    initAuth();
-  }, [fetchAuthProviders, checkAuth]);
 
   // OAuth login method with redirect support
   const login = useCallback((provider: 'google' | 'github', redirectUrl?: string) => {
     // Store intended redirect URL if provided, otherwise use current location
-    const intendedUrl = redirectUrl || window.location.pathname + window.location.search;
+    const intendedUrl = redirectUrl ?? window.location.pathname + window.location.search;
     setIntendedUrl(intendedUrl);
-    
-    // Build OAuth URL with redirect parameter
-    const oauthUrl = new URL(`/api/auth/oauth/${provider}`, window.location.origin);
-    oauthUrl.searchParams.set('redirect_url', intendedUrl);
-    
-    // Redirect to OAuth provider
-    window.location.href = oauthUrl.toString();
+
+    // Supabase redirects the browser to the provider and back to `redirectTo`;
+    // detectSessionInUrl (on by default) then completes the session there.
+    void supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${window.location.origin}${intendedUrl}`,
+      },
+    });
   }, [setIntendedUrl]);
 
   // Email/password login
@@ -208,37 +192,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
 
     try {
-      const response = await apiClient.loginWithEmail(credentials);
-
-      if (response.success && response.data) {
-        setUser({ ...response.data.user, isAnonymous: false } as AuthUser);
-        setToken(null); // Using cookies for authentication
-        setSession({
-          userId: response.data.user.id,
-          email: response.data.user.email,
-          sessionId: response.data.sessionId,
-          expiresAt: response.data.expiresAt,
-        });
-        setupTokenRefresh();
-        
-        // Navigate to intended URL or default to home
-        const intendedUrl = getIntendedUrl();
-        clearIntendedUrl();
-        navigate(intendedUrl || '/');
+      const { error: signInError } = await supabase.auth.signInWithPassword(credentials);
+      if (signInError) {
+        throw signInError;
       }
+
+      // onAuthStateChange populates user/token/session; just navigate.
+      const intendedUrl = getIntendedUrl();
+      clearIntendedUrl();
+      navigate(intendedUrl || '/');
     } catch (error) {
       console.error('Login error:', error);
-      if (error instanceof ApiError) {
-        setError(error.message);
-      } else {
-        setError('Connection error. Please try again.');
-      }
+      setError(error instanceof AuthError ? error.message : 'Connection error. Please try again.');
       // Don't navigate on error - let modal stay open
       throw error; // Re-throw to inform caller
     } finally {
       setIsLoading(false);
     }
-  }, [navigate, setupTokenRefresh, getIntendedUrl, clearIntendedUrl]);
+  }, [navigate, getIntendedUrl, clearIntendedUrl]);
 
   // Register new user
   const register = useCallback(async (data: { email: string; password: string; name?: string }) => {
@@ -246,41 +217,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
 
     try {
-      const response = await apiClient.register(data);
-
-      if (response.success && response.data) {
-        setUser({ ...response.data.user, isAnonymous: false } as AuthUser);
-        setToken(null); // Using cookies for authentication
-        setSession({
-          userId: response.data.user.id,
-          email: response.data.user.email,
-          sessionId: response.data.sessionId,
-          expiresAt: response.data.expiresAt,
-        });
-        setupTokenRefresh();
-        
-        // Navigate to intended URL or default to home
-        const intendedUrl = getIntendedUrl();
-        clearIntendedUrl();
-        navigate(intendedUrl || '/');
+      const { error: signUpError } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          data: { display_name: data.name },
+        },
+      });
+      if (signUpError) {
+        throw signUpError;
       }
+
+      // onAuthStateChange populates user/token/session; just navigate.
+      const intendedUrl = getIntendedUrl();
+      clearIntendedUrl();
+      navigate(intendedUrl || '/');
     } catch (error) {
       console.error('Registration error:', error);
-      if (error instanceof ApiError) {
-        setError(error.message);
-      } else {
-        setError('Connection error. Please try again.');
-      }
+      setError(error instanceof AuthError ? error.message : 'Connection error. Please try again.');
       throw error; // Re-throw to inform caller
     } finally {
       setIsLoading(false);
     }
-  }, [navigate, setupTokenRefresh, getIntendedUrl, clearIntendedUrl]);
+  }, [navigate, getIntendedUrl, clearIntendedUrl]);
 
   // Logout
   const logout = useCallback(async () => {
     try {
-      await apiClient.logout();
+      await supabase.auth.signOut();
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
@@ -288,17 +252,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setToken(null);
       setSession(null);
-      if (refreshTimerRef.current) {
-        clearInterval(refreshTimerRef.current);
-      }
       navigate('/');
     }
   }, [navigate]);
 
   // Refresh user profile
   const refreshUser = useCallback(async () => {
-    await checkAuth();
-  }, [checkAuth]);
+    const { data: { session } } = await supabase.auth.getSession();
+    setUser(mapUser(session?.user ?? null));
+    setToken(session?.access_token ?? null);
+    setSession(mapSession(session));
+  }, []);
 
 
   // Clear error
@@ -313,9 +277,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: !!user,
     isLoading,
     error,
-    authProviders,
-    hasOAuth,
-    requiresEmailAuth,
+    authProviders: DEFAULT_AUTH_PROVIDERS,
+    hasOAuth: true,
+    requiresEmailAuth: true,
     login, // OAuth method with redirect support
     loginWithEmail, // Email/password method
     register,

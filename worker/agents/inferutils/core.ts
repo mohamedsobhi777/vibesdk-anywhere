@@ -303,6 +303,52 @@ export async function buildGatewayUrl(
     return baseUrl;
 }
 
+/**
+ * True when a Cloudflare AI Gateway is reachable without the Workers `AI`
+ * binding — i.e. a valid `CLOUDFLARE_AI_GATEWAY_URL` is configured. Mirrors the
+ * validation in `buildGatewayUrl` so the direct-vs-gateway decision in
+ * `getConfigurationForModel` agrees with the URL it will ultimately build.
+ */
+function hasConfiguredGatewayUrl(env: Env): boolean {
+    const raw = env.CLOUDFLARE_AI_GATEWAY_URL;
+    if (!raw || raw === 'none' || raw.trim() === '') {
+        return false;
+    }
+    try {
+        const url = new URL(raw);
+        return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Direct, gateway-less OpenAI-compatible base URL for a provider, or `null`
+ * when the provider is only reachable through an AI gateway. Used when a model
+ * sets `directOverride`, or when the deployment has no Cloudflare AI Gateway at
+ * all (no `AI` binding and no `CLOUDFLARE_AI_GATEWAY_URL`) — the standalone
+ * Vercel/sandbox stack, where `env.AI.gateway(...)` would throw. Callers that
+ * take this path must strip the `provider/` prefix from the model id, since
+ * these endpoints expect the bare model name (`gemini-2.5-pro`), not the
+ * gateway compat form (`google-ai-studio/gemini-2.5-pro`).
+ */
+function directProviderBaseUrl(provider: string): string | null {
+    switch (provider) {
+        case 'google-ai-studio':
+            return 'https://generativelanguage.googleapis.com/v1beta/openai/';
+        case 'openrouter':
+            return 'https://openrouter.ai/api/v1';
+        case 'anthropic':
+            return 'https://api.anthropic.com/v1/';
+        case 'openai':
+            return 'https://api.openai.com/v1/';
+        case 'grok':
+            return 'https://api.x.ai/v1/';
+        default:
+            return null;
+    }
+}
+
 function isValidApiKey(apiKey: string): boolean {
     if (!apiKey || apiKey.trim() === '') {
         return false;
@@ -415,40 +461,53 @@ export async function getConfigurationForModel(
     baseURL: string,
     apiKey: string,
     defaultHeaders?: Record<string, string>,
+    /**
+     * True when routed directly to a provider API (no AI gateway). The caller
+     * must strip the `provider/` prefix from the model id before sending it,
+     * since direct endpoints expect the bare model name.
+     */
+    isDirect?: boolean,
 }> {
     // Determine if we're using user's own gateway (BYOK mode)
     const useUserGateway = shouldUseUserKey && userGateway && userApiToken;
 
-    let providerForcedOverride: AIGatewayProviders | undefined;
-    if (modelConfig.directOverride) {
-        switch(modelConfig.provider) {
-            case 'openrouter':
-                return {
-                    baseURL: 'https://openrouter.ai/api/v1',
-                    apiKey: env.OPENROUTER_API_KEY,
-                };
-            case 'google-ai-studio':
-                return {
-                    baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
-                    apiKey: env.GOOGLE_AI_STUDIO_API_KEY,
-                };
-            case 'anthropic':
-                return {
-                    baseURL: 'https://api.anthropic.com/v1/',
-                    apiKey: env.ANTHROPIC_API_KEY,
-                };
-            default:
-                providerForcedOverride = modelConfig.provider as AIGatewayProviders;
-                break;
-        }
-    }
-
     // Resolve the API key first so the baseURL choice can be coupled to key
-    // ownership. A user-supplied gateway baseUrl is only honored when the
+    // ownership, and so the direct-provider path below reuses the same
+    // (BYOK-aware) key. A user-supplied gateway baseUrl is only honored when the
     // resolved key is the user's own credential; if we fall back to a
     // platform-owned env key, the override is dropped and we route through the
     // platform gateway instead.
     const { apiKey, isUserCredential } = await getApiKey(modelConfig.provider, env, userId, runtimeOverrides, shouldUseUserKey, userApiToken);
+
+    // Route straight to the provider's API — no gateway — when a model opts in
+    // via `directOverride`, or when this deployment has no Cloudflare AI Gateway
+    // at all (no `AI` binding and no `CLOUDFLARE_AI_GATEWAY_URL`): the standalone
+    // Vercel/sandbox stack, where the binding path in buildGatewayUrl would
+    // throw. A per-request user gateway (BYOK) or SDK `aiGatewayOverride` still
+    // takes precedence and falls through to the gateway path below.
+    const noPlatformGateway =
+        !useUserGateway &&
+        !runtimeOverrides?.aiGatewayOverride?.baseUrl &&
+        !env.AI &&
+        !hasConfiguredGatewayUrl(env);
+
+    let providerForcedOverride: AIGatewayProviders | undefined;
+    if (modelConfig.directOverride || noPlatformGateway) {
+        const directBaseURL = directProviderBaseUrl(modelConfig.provider);
+        if (directBaseURL) {
+            return { baseURL: directBaseURL, apiKey, isDirect: true };
+        }
+        if (noPlatformGateway) {
+            throw new Error(
+                `No AI gateway is configured and provider '${modelConfig.provider}' has no direct endpoint. ` +
+                `Set CLOUDFLARE_AI_GATEWAY_URL, or select a provider with a direct endpoint ` +
+                `(google-ai-studio, anthropic, openai, grok, openrouter).`,
+            );
+        }
+        // `directOverride` requested for a provider only reachable via the
+        // gateway by slug (e.g. google-vertex-ai): fall through to the gateway.
+        providerForcedOverride = modelConfig.provider as AIGatewayProviders;
+    }
 
     const requestedCustomGateway = !!runtimeOverrides?.aiGatewayOverride?.baseUrl;
     const honorGatewayOverride = requestedCustomGateway && isUserCredential;
@@ -728,7 +787,7 @@ export async function infer<OutputSchema extends z.ZodObject>({
         
         const modelConfig = AI_MODEL_CONFIG[modelName as AIModels];
 
-        const { apiKey, baseURL, defaultHeaders } = await getConfigurationForModel(
+        const { apiKey, baseURL, defaultHeaders, isDirect } = await getConfigurationForModel(
             modelConfig,
             env,
             metadata.userId,
@@ -741,6 +800,16 @@ export async function infer<OutputSchema extends z.ZodObject>({
 
         // Remove [*.] from model name
         modelName = modelName.replace(/\[.*?\]/, '');
+
+        // Direct provider endpoints (no gateway) expect the bare model id
+        // (e.g. "gemini-2.5-pro"), not the "provider/model" form the Cloudflare
+        // gateway compat route uses. Strip the leading provider segment.
+        if (isDirect) {
+            const slash = modelName.indexOf('/');
+            if (slash !== -1) {
+                modelName = modelName.slice(slash + 1);
+            }
+        }
 
         const client = new OpenAI({ apiKey, baseURL: baseURL, defaultHeaders });
         const schemaObj =

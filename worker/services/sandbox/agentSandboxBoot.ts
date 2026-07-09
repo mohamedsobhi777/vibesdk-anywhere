@@ -152,6 +152,28 @@ export async function bootAgentSandbox(opts: {
         envVars.CLOUDFLARE_API_TOKEN = source.CLOUDFLARE_API_TOKEN;
     }
 
+    // LLM provider keys (+ optional PLATFORM_MODEL_PROVIDERS model map) so the
+    // in-sandbox agent process can run inference. With no Cloudflare AI Gateway
+    // present, core.ts routes these providers directly (getConfigurationForModel);
+    // the egress allowlist above already permits each provider host. These are
+    // isolated to the agent process: the generated app's dev server is spawned
+    // with a replacement env (localSandbox.ts), so it cannot read them.
+    const AGENT_LLM_ENV_KEYS = [
+        'GOOGLE_AI_STUDIO_API_KEY',
+        'ANTHROPIC_API_KEY',
+        'OPENAI_API_KEY',
+        'OPENROUTER_API_KEY',
+        'GROK_API_KEY',
+        'CEREBRAS_API_KEY',
+        'PLATFORM_MODEL_PROVIDERS',
+    ] as const;
+    for (const key of AGENT_LLM_ENV_KEYS) {
+        const value = source[key];
+        if (value) {
+            envVars[key] = value;
+        }
+    }
+
     const sandbox = await api.create({
         apiKey: bootEnv.apiKey,
         baseUrl,

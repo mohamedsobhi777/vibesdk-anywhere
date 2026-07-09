@@ -98,6 +98,70 @@ describe('getConfigurationForModel - gateway/key coupling', () => {
 	});
 });
 
+describe('getConfigurationForModel - direct provider routing (no gateway)', () => {
+	const GEMINI_MODEL_CONFIG: AIModelConfig = {
+		name: 'gemini-test',
+		size: ModelSize.REGULAR,
+		provider: 'google-ai-studio',
+		creditCost: 1,
+		contextSize: 1_000_000,
+	};
+
+	// Standalone stack: no Workers `AI` binding and no gateway URL, so the
+	// binding path in buildGatewayUrl would throw and direct routing must win.
+	function standaloneEnv(overrides: Record<string, unknown> = {}): Env {
+		return {
+			...env,
+			AI: undefined,
+			CLOUDFLARE_AI_GATEWAY_URL: undefined,
+			GOOGLE_AI_STUDIO_API_KEY: PLATFORM_KEY,
+			...overrides,
+		} as unknown as Env;
+	}
+
+	it('routes google-ai-studio directly to the Google endpoint with the platform key', async () => {
+		const { apiKey, baseURL, isDirect } = await getConfigurationForModel(
+			GEMINI_MODEL_CONFIG,
+			standaloneEnv(),
+			'user-1',
+		);
+
+		expect(isDirect).toBe(true);
+		expect(baseURL).toBe('https://generativelanguage.googleapis.com/v1beta/openai/');
+		expect(apiKey).toBe(PLATFORM_KEY);
+	});
+
+	it('throws for a provider with no direct endpoint when no gateway is configured', async () => {
+		const vertexConfig: AIModelConfig = { ...GEMINI_MODEL_CONFIG, provider: 'google-vertex-ai' };
+		await expect(
+			getConfigurationForModel(vertexConfig, standaloneEnv(), 'user-1'),
+		).rejects.toThrow(/no direct endpoint/);
+	});
+
+	it('still routes through the gateway when CLOUDFLARE_AI_GATEWAY_URL is configured', async () => {
+		const { baseURL, isDirect } = await getConfigurationForModel(
+			GEMINI_MODEL_CONFIG,
+			standaloneEnv({ CLOUDFLARE_AI_GATEWAY_URL: PLATFORM_GATEWAY }),
+			'user-1',
+		);
+
+		expect(isDirect).toBeUndefined();
+		expect(baseURL.startsWith(PLATFORM_GATEWAY)).toBe(true);
+	});
+
+	it('honors an explicit directOverride even when a gateway is available', async () => {
+		const directModel: AIModelConfig = { ...GEMINI_MODEL_CONFIG, directOverride: true };
+		const { baseURL, isDirect } = await getConfigurationForModel(
+			directModel,
+			standaloneEnv({ CLOUDFLARE_AI_GATEWAY_URL: PLATFORM_GATEWAY }),
+			'user-1',
+		);
+
+		expect(isDirect).toBe(true);
+		expect(baseURL).toBe('https://generativelanguage.googleapis.com/v1beta/openai/');
+	});
+});
+
 describe('credentialsToRuntimeOverrides - baseUrl validation', () => {
 	it('drops a non-https gateway baseUrl', () => {
 		const result = credentialsToRuntimeOverrides({

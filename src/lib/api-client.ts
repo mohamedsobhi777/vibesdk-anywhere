@@ -66,6 +66,7 @@ import {
 	SecurityErrorType,
 } from '@/api-types';
 import { toast } from 'sonner';
+import { supabase } from './supabase';
 
 /**
  * Global auth modal trigger for 401 interception
@@ -169,10 +170,19 @@ class ApiClient {
 	private async getAuthHeaders(): Promise<Record<string, string>> {
 		const headers: Record<string, string> = {};
 
-		// Add session token for anonymous users if not authenticated
-		// This will be handled automatically by cookies/credentials for authenticated users
+		// Attach the Supabase access token as a Bearer header — this is what the
+		// Worker's auth middleware verifies (extractBearerToken, Bearer-first).
+		// Supabase stores the session in localStorage for this SPA, so unlike the
+		// retired Cloudflare HttpOnly-cookie flow there is no cookie the browser
+		// sends automatically; the token must be added explicitly here.
+		const { data: { session } } = await supabase.auth.getSession();
+		if (session?.access_token) {
+			headers['Authorization'] = `Bearer ${session.access_token}`;
+		}
+
+		// Add session token for anonymous users (only when not signed in).
 		const sessionToken = localStorage.getItem('anonymous_session_token');
-		if (sessionToken && !document.cookie.includes('session=')) {
+		if (sessionToken && !session) {
 			headers['X-Session-Token'] = sessionToken;
 		}
 
@@ -181,9 +191,6 @@ class ApiClient {
 			headers['X-CSRF-Token'] = this.csrfTokenInfo.token;
 		}
 
-		// The Cloudflare OAuth token lives in an HttpOnly cookie. The browser
-		// attaches it automatically on same-origin requests; there is nothing
-		// for the API client to add.
 		return headers;
 	}
 

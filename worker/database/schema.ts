@@ -12,6 +12,7 @@ import {
     customType,
     index,
     uniqueIndex,
+    primaryKey,
 } from 'drizzle-orm/pg-core';
 
 // Schema enum arrays derived from config types
@@ -115,6 +116,44 @@ export const apps = pgTable('apps', {
     index('apps_framework_idx').on(table.framework),
     index('apps_created_at_idx').on(table.createdAt),
     index('apps_parent_app_idx').on(table.parentAppId),
+]);
+
+// ========================================
+// APP SOCIAL INTERACTIONS
+// ========================================
+
+/**
+ * Favorites table - per-user personal bookmarks on apps. Composite
+ * primary key on (user_id, app_id) both enforces "one favorite per user
+ * per app" and serves as the index for "this user's favorites" lookups;
+ * `favorites_app_idx` covers the reverse "who favorited this app"/
+ * per-app-count direction.
+ */
+export const favorites = pgTable('favorites', {
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    appId: text('app_id').notNull().references(() => apps.id, { onDelete: 'cascade' }),
+
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+    primaryKey({ columns: [table.userId, table.appId] }),
+    index('favorites_user_idx').on(table.userId),
+    index('favorites_app_idx').on(table.appId),
+]);
+
+/**
+ * Stars table - public per-app popularity signal (like GitHub stars),
+ * distinct from `favorites` (a private bookmark). Same shape and PK
+ * strategy as `favorites`.
+ */
+export const stars = pgTable('stars', {
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    appId: text('app_id').notNull().references(() => apps.id, { onDelete: 'cascade' }),
+
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+    primaryKey({ columns: [table.userId, table.appId] }),
+    index('stars_user_idx').on(table.userId),
+    index('stars_app_idx').on(table.appId),
 ]);
 
 // ========================================
@@ -272,6 +311,12 @@ export type NewUser = typeof users.$inferInsert;
 
 export type App = typeof apps.$inferSelect;
 export type NewApp = typeof apps.$inferInsert;
+
+export type Favorite = typeof favorites.$inferSelect;
+export type NewFavorite = typeof favorites.$inferInsert;
+
+export type Star = typeof stars.$inferSelect;
+export type NewStar = typeof stars.$inferInsert;
 
 export type UserModelConfig = typeof userModelConfigs.$inferSelect;
 export type NewUserModelConfig = typeof userModelConfigs.$inferInsert;

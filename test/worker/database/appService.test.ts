@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getTableConfig, type PgTable } from 'drizzle-orm/pg-core';
-import { AppService, DeferredInPhase2aError } from 'worker/database/services/AppService';
+import { AppService } from 'worker/database/services/AppService';
 import * as schema from 'worker/database/schema';
 import { RUNTIME_MODE_KEY, STANDALONE_RUNTIME_MODE } from 'worker/utils/runtimeMode';
 
@@ -30,10 +30,13 @@ function tableName(table: unknown): string {
  *   - updateDeploymentId -> updateDeploymentId
  *   - listByUser       -> getUserAppsWithFavorites
  *
- * Also covers the phase-2a "deferred" contract: methods/branches that
- * depend on the favorites/stars/appViews tables (dropped in the lean
- * 7-table Postgres schema rewrite) throw `DeferredInPhase2aError`, except
- * `recordAppView`, which is a documented fail-safe no-op.
+ * Also covers favorites/stars, ported back to Postgres in
+ * supabase/migrations/20260709000001_favorites_stars.sql:
+ * `toggleAppFavorite`, `toggleAppStar`, `getFavoriteAppsOnly`, and the
+ * `sort=starred` branches of `getUserAppsWithAnalytics`/`getUserAppsCount`,
+ * which used to throw `DeferredInPhase2aError` and now resolve normally.
+ * `appViews` remains deferred - `recordAppView` stays a documented
+ * fail-safe no-op rather than a throw.
  */
 
 type Row = Record<string, unknown>;
@@ -44,7 +47,7 @@ interface RecordedCall {
     chainCalls: { method: string; args: unknown[] }[];
 }
 
-const CHAIN_METHODS = ['from', 'where', 'leftJoin', 'innerJoin', 'orderBy', 'limit', 'offset', 'values', 'set', 'returning', 'groupBy'] as const;
+const CHAIN_METHODS = ['from', 'where', 'leftJoin', 'innerJoin', 'orderBy', 'limit', 'offset', 'values', 'set', 'returning', 'groupBy', 'onConflictDoNothing'] as const;
 
 /**
  * Minimal fake drizzle query builder. Every chain method records its call
@@ -220,20 +223,25 @@ describe('AppService (postgres)', () => {
     });
 
     describe('getUserAppsWithFavorites (listByUser)', () => {
-        it('lists apps owned by the user with isFavorite stubbed false', async () => {
+        it('lists apps owned by the user with real isFavorite from the favorites table', async () => {
             const app1 = fakeApp({ id: 'app-1', title: 'First' });
             const app2 = fakeApp({ id: 'app-2', title: 'Second' });
-            const { service, calls } = createAppServiceWithFakeDb([[app1, app2]]);
+            // Second query returns only app-1's favorites row.
+            const { service, calls } = createAppServiceWithFakeDb([[app1, app2], [{ appId: 'app-1' }]]);
 
             const result = await service.getUserAppsWithFavorites('user-1', { limit: 10, offset: 0 });
 
             expect(result).toHaveLength(2);
-            expect(result[0]).toMatchObject({ id: 'app-1', isFavorite: false });
+            expect(result[0]).toMatchObject({ id: 'app-1', isFavorite: true });
             expect(result[1]).toMatchObject({ id: 'app-2', isFavorite: false });
+
+            expect(calls).toHaveLength(2);
             expect(calls[0].entry).toBe('select');
             expect(calls[0].chainCalls.map((c) => c.method)).toEqual(['from', 'where', 'orderBy', 'limit', 'offset']);
-            // Only one query - the (now-dropped) favorites lookup no longer runs.
-            expect(calls).toHaveLength(1);
+
+            expect(calls[1].entry).toBe('select');
+            const favoritesFrom = calls[1].chainCalls.find((c) => c.method === 'from');
+            expect(tableName(favoritesFrom?.args[0])).toBe('favorites');
         });
 
         it('returns an empty array without a second query when the user has no apps', async () => {
@@ -246,42 +254,123 @@ describe('AppService (postgres)', () => {
         });
     });
 
-    describe('deferred-in-2a stubs (favorites/stars/appViews tables not yet ported)', () => {
-        it('toggleAppFavorite throws DeferredInPhase2aError', async () => {
-            const { service } = createAppServiceWithFakeDb([]);
-            await expect(service.toggleAppFavorite('user-1', 'app-1')).rejects.toThrow(DeferredInPhase2aError);
+    describe('toggleAppFavorite', () => {
+        it('inserts a favorites row when none exists yet (favorite)', async () => {
+            const { service, calls } = createAppServiceWithFakeDb([[]]);
+
+            const result = await service.toggleAppFavorite('user-1', 'app-1');
+
+            expect(result).toEqual({ isFavorite: true });
+            expect(calls).toHaveLength(2);
+
+            expect(calls[0].entry).toBe('select');
+            const selectFrom = calls[0].chainCalls.find((c) => c.method === 'from');
+            expect(tableName(selectFrom?.args[0])).toBe('favorites');
+
+            expect(calls[1].entry).toBe('insert');
+            expect(tableName(calls[1].args[0])).toBe('favorites');
+            expect(calls[1].chainCalls.map((c) => c.method)).toEqual(['values', 'onConflictDoNothing']);
+            expect(calls[1].chainCalls[0].args[0]).toEqual({ userId: 'user-1', appId: 'app-1' });
         });
 
-        it('toggleAppStar throws DeferredInPhase2aError', async () => {
-            const { service } = createAppServiceWithFakeDb([]);
-            await expect(service.toggleAppStar('user-1', 'app-1')).rejects.toThrow(DeferredInPhase2aError);
+        it('deletes the favorites row when one already exists (unfavorite)', async () => {
+            const { service, calls } = createAppServiceWithFakeDb([[{ userId: 'user-1' }]]);
+
+            const result = await service.toggleAppFavorite('user-1', 'app-1');
+
+            expect(result).toEqual({ isFavorite: false });
+            expect(calls).toHaveLength(2);
+            expect(calls[1].entry).toBe('delete');
+            expect(tableName(calls[1].args[0])).toBe('favorites');
+        });
+    });
+
+    describe('toggleAppStar', () => {
+        it('inserts a stars row and returns the new count when none exists yet (star)', async () => {
+            const { service, calls } = createAppServiceWithFakeDb([[], [], [{ count: 1 }]]);
+
+            const result = await service.toggleAppStar('user-1', 'app-1');
+
+            expect(result).toEqual({ isStarred: true, starCount: 1 });
+            expect(calls).toHaveLength(3);
+
+            expect(calls[0].entry).toBe('select');
+            const existsFrom = calls[0].chainCalls.find((c) => c.method === 'from');
+            expect(tableName(existsFrom?.args[0])).toBe('stars');
+
+            expect(calls[1].entry).toBe('insert');
+            expect(tableName(calls[1].args[0])).toBe('stars');
+            expect(calls[1].chainCalls.map((c) => c.method)).toEqual(['values', 'onConflictDoNothing']);
+
+            expect(calls[2].entry).toBe('select');
+            const countFrom = calls[2].chainCalls.find((c) => c.method === 'from');
+            expect(tableName(countFrom?.args[0])).toBe('stars');
         });
 
-        it('getFavoriteAppsOnly throws DeferredInPhase2aError', async () => {
-            const { service } = createAppServiceWithFakeDb([]);
-            await expect(service.getFavoriteAppsOnly('user-1')).rejects.toThrow(DeferredInPhase2aError);
+        it('deletes the stars row and returns the new count when one already exists (unstar)', async () => {
+            const { service, calls } = createAppServiceWithFakeDb([[{ userId: 'user-1' }], [], [{ count: 4 }]]);
+
+            const result = await service.toggleAppStar('user-1', 'app-1');
+
+            expect(result).toEqual({ isStarred: false, starCount: 4 });
+            expect(calls[1].entry).toBe('delete');
+            expect(tableName(calls[1].args[0])).toBe('stars');
         });
 
-        it('getUserAppsWithAnalytics throws for sort=starred but resolves normally for sort=recent', async () => {
-            const { service: starredService } = createAppServiceWithFakeDb([]);
-            await expect(starredService.getUserAppsWithAnalytics('user-1', { sort: 'starred' }))
-                .rejects.toThrow(DeferredInPhase2aError);
+        it('returns starCount 0 when the count query returns no row', async () => {
+            const { service } = createAppServiceWithFakeDb([[], [], []]);
 
-            const { service: recentService, calls } = createAppServiceWithFakeDb([[]]);
-            await expect(recentService.getUserAppsWithAnalytics('user-1', { sort: 'recent' })).resolves.toEqual([]);
+            const result = await service.toggleAppStar('user-1', 'app-1');
+
+            expect(result).toEqual({ isStarred: true, starCount: 0 });
+        });
+    });
+
+    describe('getFavoriteAppsOnly', () => {
+        it('joins favorites to apps and marks every row isFavorite=true', async () => {
+            const app1 = fakeApp({ id: 'app-1', title: 'Favorited One' });
+            const app2 = fakeApp({ id: 'app-2', title: 'Favorited Two' });
+            const { service, calls } = createAppServiceWithFakeDb([[{ app: app1 }, { app: app2 }]]);
+
+            const result = await service.getFavoriteAppsOnly('user-1');
+
+            expect(result).toHaveLength(2);
+            expect(result[0]).toMatchObject({ id: 'app-1', isFavorite: true });
+            expect(result[1]).toMatchObject({ id: 'app-2', isFavorite: true });
+
+            expect(calls).toHaveLength(1);
+            expect(calls[0].chainCalls.map((c) => c.method)).toEqual(['from', 'innerJoin', 'where', 'orderBy', 'limit', 'offset']);
+            const fromCall = calls[0].chainCalls.find((c) => c.method === 'from');
+            expect(tableName(fromCall?.args[0])).toBe('favorites');
+            const joinCall = calls[0].chainCalls.find((c) => c.method === 'innerJoin');
+            expect(tableName(joinCall?.args[0])).toBe('apps');
+        });
+
+        it('returns an empty array when the user has no favorites', async () => {
+            const { service, calls } = createAppServiceWithFakeDb([[]]);
+
+            const result = await service.getFavoriteAppsOnly('user-1');
+
+            expect(result).toEqual([]);
+            expect(calls).toHaveLength(1);
+        });
+    });
+
+    describe('sort=starred (favorites/stars now ported)', () => {
+        it('getUserAppsWithAnalytics resolves (no longer throws) for sort=starred', async () => {
+            const { service, calls } = createAppServiceWithFakeDb([[]]);
+            await expect(service.getUserAppsWithAnalytics('user-1', { sort: 'starred' })).resolves.toEqual([]);
             expect(calls).toHaveLength(1);
         });
 
-        it('getUserAppsCount throws for sort=starred but resolves normally for sort=recent', async () => {
-            const { service: starredService } = createAppServiceWithFakeDb([]);
-            await expect(starredService.getUserAppsCount('user-1', { sort: 'starred' }))
-                .rejects.toThrow(DeferredInPhase2aError);
-
-            const { service: recentService } = createAppServiceWithFakeDb([[{ count: 3 }]]);
-            await expect(recentService.getUserAppsCount('user-1', { sort: 'recent' })).resolves.toBe(3);
+        it('getUserAppsCount resolves (no longer throws) for sort=starred', async () => {
+            const { service } = createAppServiceWithFakeDb([[{ count: 5 }]]);
+            await expect(service.getUserAppsCount('user-1', { sort: 'starred' })).resolves.toBe(5);
         });
+    });
 
-        it('recordAppView is a fail-safe no-op, not a throw', async () => {
+    describe('recordAppView (appViews table still deferred in 2a)', () => {
+        it('is a fail-safe no-op, not a throw', async () => {
             const { service, calls } = createAppServiceWithFakeDb([]);
             await expect(service.recordAppView('app-1', 'user-1')).resolves.toBeUndefined();
             expect(calls).toHaveLength(0);

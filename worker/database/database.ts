@@ -16,6 +16,8 @@ import { buildDrizzle } from './pgConnection';
 export type {
     User, NewUser,
     App, NewApp,
+    Favorite, NewFavorite,
+    Star, NewStar,
     UserModelConfig, NewUserModelConfig,
     UserModelProvider, NewUserModelProvider,
     UserSecret, NewUserSecret,

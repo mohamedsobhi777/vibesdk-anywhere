@@ -60,6 +60,48 @@ describe('schema (pg-core)', () => {
         });
     });
 
+    describe('favorites', () => {
+        it('has a uuid user_id, text app_id, and a timestamptz created_at', () => {
+            expect(findColumn(schema.favorites, 'user_id').getSQLType()).toBe('uuid');
+            expect(findColumn(schema.favorites, 'app_id').getSQLType()).toBe('text');
+            expect(findColumn(schema.favorites, 'created_at').getSQLType()).toBe('timestamp with time zone');
+        });
+
+        it('has a composite primary key on (user_id, app_id)', () => {
+            const config = getTableConfig(schema.favorites);
+            expect(config.primaryKeys).toHaveLength(1);
+            expect(config.primaryKeys[0].columns.map((column) => column.name)).toEqual(['user_id', 'app_id']);
+        });
+
+        it('indexes user_id and app_id', () => {
+            expect(indexNames(schema.favorites)).toEqual(expect.arrayContaining([
+                'favorites_user_idx',
+                'favorites_app_idx',
+            ]));
+        });
+    });
+
+    describe('stars', () => {
+        it('has a uuid user_id, text app_id, and a timestamptz created_at', () => {
+            expect(findColumn(schema.stars, 'user_id').getSQLType()).toBe('uuid');
+            expect(findColumn(schema.stars, 'app_id').getSQLType()).toBe('text');
+            expect(findColumn(schema.stars, 'created_at').getSQLType()).toBe('timestamp with time zone');
+        });
+
+        it('has a composite primary key on (user_id, app_id)', () => {
+            const config = getTableConfig(schema.stars);
+            expect(config.primaryKeys).toHaveLength(1);
+            expect(config.primaryKeys[0].columns.map((column) => column.name)).toEqual(['user_id', 'app_id']);
+        });
+
+        it('indexes user_id and app_id', () => {
+            expect(indexNames(schema.stars)).toEqual(expect.arrayContaining([
+                'stars_user_idx',
+                'stars_app_idx',
+            ]));
+        });
+    });
+
     describe('userModelConfigs', () => {
         it('is unique on (user_id, agent_action_name)', () => {
             const unique = getTableConfig(schema.userModelConfigs).indexes.find((index) => index.config.unique);

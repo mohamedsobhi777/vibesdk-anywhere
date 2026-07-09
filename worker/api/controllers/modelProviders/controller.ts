@@ -6,6 +6,7 @@ import { BaseController } from '../baseController';
 import { RouteContext } from '../../types/route-context';
 import { ApiResponse, ControllerResponse } from '../types';
 import { ModelProvidersService } from '../../../database/services/ModelProvidersService';
+import type { UserModelProvider } from '../../../database/schema';
 import { z } from 'zod';
 import {
     ModelProvidersListData,
@@ -16,9 +17,23 @@ import {
     ModelProviderTestData,
     CreateProviderRequest,
     UpdateProviderRequest,
-    TestProviderRequest
+    TestProviderRequest,
+    SafeModelProvider
 } from './types';
 import { createLogger } from '../../../logger';
+
+/**
+ * Strip the encrypted API key ciphertext before a provider row leaves the
+ * server. `hasApiKey` lets the UI show "key set" without ever exposing the
+ * secret itself.
+ */
+function toSafeProvider(provider: UserModelProvider): SafeModelProvider {
+    const { apiKeyEncrypted, ...safeFields } = provider;
+    return {
+        ...safeFields,
+        hasApiKey: Boolean(apiKeyEncrypted)
+    };
+}
 
 // Validation schemas
 const createProviderSchema = z.object({
@@ -54,9 +69,9 @@ export class ModelProvidersController extends BaseController {
             const user = context.user!;
             const modelProvidersService = new ModelProvidersService(env);
             const providers = await modelProvidersService.getUserProviders(user.id);
-            
+
             return ModelProvidersController.createSuccessResponse({
-                providers: providers.filter(p => p.isActive)
+                providers: providers.filter(p => p.isActive).map(toSafeProvider)
             });
         } catch (error) {
             this.logger.error('Error getting providers:', error);
@@ -86,7 +101,7 @@ export class ModelProvidersController extends BaseController {
             }
 
             return ModelProvidersController.createSuccessResponse({
-                provider
+                provider: toSafeProvider(provider)
             });
         } catch (error) {
             this.logger.error('Error getting provider:', error);

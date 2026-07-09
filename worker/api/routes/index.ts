@@ -1,6 +1,7 @@
 import { setupAppRoutes } from './appRoutes';
 import { setupUserRoutes } from './userRoutes';
 import { setupAnalyticsRoutes } from './analyticsRoutes';
+import { setupSecretsRoutes } from './secretsRoutes';
 // import { setupUserSecretsRoutes } from './userSecretsRoutes';
 import { setupModelConfigRoutes } from './modelConfigRoutes';
 import { setupModelProviderRoutes } from './modelProviderRoutes';
@@ -55,10 +56,11 @@ export function setupRoutes(app: Hono<AppEnv>): void {
     // AI Gateway Analytics routes
     setupAnalyticsRoutes(app);
 
-    // // Secrets management routes (legacy D1-based)
-    // setupSecretsRoutes(app);
+    // Secrets management routes (static templates only - legacy D1-based
+    // CRUD routes were retired along with the D1 secrets store)
+    setupSecretsRoutes(app);
 
-    // // User secrets vault routes
+    // User secrets vault routes (DO-coupled - deferred)
     // setupUserSecretsRoutes(app);
 
     // Model configuration and provider keys routes

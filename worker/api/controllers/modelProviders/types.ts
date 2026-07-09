@@ -6,13 +6,22 @@
 import type { UserModelProvider } from '../../../database/schema';
 import type { ApiResponse } from '../types';
 
+/**
+ * Provider shape safe to return to clients - omits `apiKeyEncrypted` (the
+ * stored ciphertext) and surfaces `hasApiKey` instead so the UI can show
+ * "key set" without the secret ever leaving the server.
+ */
+export interface SafeModelProvider extends Omit<UserModelProvider, 'apiKeyEncrypted'> {
+    hasApiKey: boolean;
+}
+
 // Response data types
 export interface ModelProvidersListData {
-    providers: UserModelProvider[];
+    providers: SafeModelProvider[];
 }
 
 export interface ModelProviderData {
-    provider: UserModelProvider;
+    provider: SafeModelProvider;
 }
 
 export interface ModelProviderCreateData {

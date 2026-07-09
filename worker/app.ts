@@ -61,8 +61,12 @@ export function createApp(env: Env): Hono<AppEnv> {
             if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
                 await next();
                 
-                // Only set CSRF token for successful API responses
-                if (c.req.url.startsWith('/api/') && c.res.status < 400) {
+                // Only set CSRF token for successful API responses. Skip the
+                // dedicated /api/auth/csrf-token endpoint: it sets its own
+                // cookie to the exact token it returns, and a second enforce()
+                // here would append a different token and break double-submit.
+                const isCsrfTokenEndpoint = new URL(c.req.url).pathname === '/api/auth/csrf-token';
+                if (c.req.url.startsWith('/api/') && c.res.status < 400 && !isCsrfTokenEndpoint) {
                     await CsrfService.enforce(c.req.raw, c.res);
                 }
                 

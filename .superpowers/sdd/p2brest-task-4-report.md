@@ -196,7 +196,7 @@ re-confirm all green.
 
 ## Commit
 
-`67f7f24` — `feat: favorites + stars postgres tables and app service`
+`843ca7b` — `feat: favorites + stars postgres tables and app service`
 (files: `worker/database/schema.ts`, `worker/database/database.ts`,
 `worker/database/services/AppService.ts`,
 `test/worker/database/schema.test.ts`, `test/worker/database/appService.test.ts`,

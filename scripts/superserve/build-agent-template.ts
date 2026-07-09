@@ -58,12 +58,22 @@ function onBuildLog(event: BuildLogEvent): void {
 }
 
 async function main(apiKey: string): Promise<void> {
+	// Delete any existing template with this name first. The delete endpoint
+	// requires the template's UUID, not its name (`deleteById("<name>")` fails
+	// with "not a valid UUID"), so resolve the id via list(). The previous
+	// connect(name)/deleteById(name) path silently no-op'd and left the old
+	// template in place, so `create` failed with a 409 conflict.
 	try {
-		const existing = await Template.connect(TEMPLATE_NAME, { apiKey, baseUrl: BASE_URL });
-		console.log(`Template "${TEMPLATE_NAME}" already exists; deleting before rebuild`);
-		await existing.delete();
-	} catch {
-		// Not found: this is the first build.
+		const templates = await Template.list({ apiKey, baseUrl: BASE_URL });
+		const existing = templates.find((t) => t.name === TEMPLATE_NAME);
+		if (existing) {
+			console.log(`Deleting existing template "${TEMPLATE_NAME}" (${existing.id}) before rebuild`);
+			await Template.deleteById(existing.id, { apiKey, baseUrl: BASE_URL });
+		} else {
+			console.log(`No existing "${TEMPLATE_NAME}" template found; first build`);
+		}
+	} catch (error) {
+		console.log(`Pre-delete lookup failed (continuing to create): ${error instanceof Error ? error.message : String(error)}`);
 	}
 
 	console.log(`Creating template "${TEMPLATE_NAME}" from ${AGENT_REPO}@${AGENT_REF}${GIT_CLONE_TOKEN ? ' (private, token)' : ''}`);
@@ -72,9 +82,10 @@ async function main(apiKey: string): Promise<void> {
 		baseUrl: BASE_URL,
 		name: TEMPLATE_NAME,
 		from: 'ubuntu:24.04',
-		vcpu: 4,
-		memoryMib: 8192,
-		diskMib: 10240,
+		// SuperServe team limits (this account): vcpu 1-2, memory 256-2048 MiB.
+		vcpu: 2,
+		memoryMib: 2048,
+		diskMib: 8192,
 		steps: [
 			{
 				run: 'apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y curl ca-certificates git unzip procps',

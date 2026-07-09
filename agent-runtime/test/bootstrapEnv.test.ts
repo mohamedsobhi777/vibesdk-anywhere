@@ -73,6 +73,8 @@ describe('parseBootstrapEnv', () => {
 			selfPreviewBaseUrl: undefined,
 			cloudflareAiGatewayUrl: undefined,
 			cloudflareAiGatewayToken: undefined,
+			cloudflareAccountId: undefined,
+			cloudflareApiToken: undefined,
 		});
 	});
 
@@ -101,11 +103,15 @@ describe('parseBootstrapEnv', () => {
 			SELF_PREVIEW_BASE_URL: 'https://preview.example.com',
 			CLOUDFLARE_AI_GATEWAY_URL: 'https://ai-gw.example.com',
 			CLOUDFLARE_AI_GATEWAY_TOKEN: 'cf-token',
+			CLOUDFLARE_ACCOUNT_ID: 'cf-account-id',
+			CLOUDFLARE_API_TOKEN: 'cf-api-token',
 		});
 
 		expect(result.selfPreviewBaseUrl).toBe('https://preview.example.com');
 		expect(result.cloudflareAiGatewayUrl).toBe('https://ai-gw.example.com');
 		expect(result.cloudflareAiGatewayToken).toBe('cf-token');
+		expect(result.cloudflareAccountId).toBe('cf-account-id');
+		expect(result.cloudflareApiToken).toBe('cf-api-token');
 	});
 
 	it('sets optional vars to undefined when absent', () => {
@@ -121,6 +127,8 @@ describe('parseBootstrapEnv', () => {
 		expect(result.selfPreviewBaseUrl).toBeUndefined();
 		expect(result.cloudflareAiGatewayUrl).toBeUndefined();
 		expect(result.cloudflareAiGatewayToken).toBeUndefined();
+		expect(result.cloudflareAccountId).toBeUndefined();
+		expect(result.cloudflareApiToken).toBeUndefined();
 	});
 
 	describe('identifier charset guard', () => {

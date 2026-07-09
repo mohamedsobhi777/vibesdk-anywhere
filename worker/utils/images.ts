@@ -3,8 +3,10 @@
 // Screenshot storage helpers
 // ===============================
 
+import { createClient } from "@supabase/supabase-js";
 import { ImageAttachment, ProcessedImageAttachment, SupportedImageMimeType } from "worker/types/image-attachment";
 import { getProtocolForHost } from "./urls";
+import { isStandaloneRuntime } from "./runtimeMode";
 
 // ===============================
 // Blank screenshot detection
@@ -131,6 +133,17 @@ export async function uploadImageToCloudflareImages(env: Env, image: ImageAttach
 }
 
 export function getPublicUrlForR2Image(env: Env, r2Key: string): string {
+    // The sandboxed standalone agent runtime does not receive CUSTOM_DOMAIN
+    // in its process env (worker/services/sandbox/agentSandboxBoot.ts's
+    // envVars), so getProtocolForHost(undefined) would throw there. Falling
+    // back to a path-only URL is safe and correct: ScreenshotSecurity.signUrl
+    // already treats any URL that isn't "http(s)://"-prefixed as relative and
+    // returns it unchanged (aside from the signed query param), and the SPA
+    // + /api/* are served from the same origin, so a relative path resolves
+    // correctly in the browser regardless of which backend stored the bytes.
+    if (!env.CUSTOM_DOMAIN) {
+        return `/api/${r2Key}`;
+    }
     const protocol = getProtocolForHost(env.CUSTOM_DOMAIN);
     const base = `${protocol}://${env.CUSTOM_DOMAIN}`;
     const url = `${base}/api/${r2Key}`;
@@ -145,10 +158,105 @@ export async function uploadImageToR2(env: Env, image: ImageAttachment, type: Im
     return { url: getPublicUrlForR2Image(env, r2Key), r2Key };
 }
 
-export async function uploadImage(env: Env, image: ImageAttachment, type: ImageType): Promise<ProcessedImageAttachment> {
+// ===============================
+// Supabase Storage (new-stack image backend)
+// ===============================
+
+/**
+ * Single Supabase Storage bucket backing both screenshot and upload images
+ * on the standalone runtime, mirroring how `TEMPLATES_BUCKET` is one R2
+ * bucket shared across image types on Workers (images are differentiated by
+ * the `${type}/${id}/${filename}` key prefix, not by bucket). Must be
+ * created in the Supabase project before screenshots work on the new stack.
+ */
+const SCREENSHOTS_BUCKET = 'screenshots';
+
+/**
+ * Minimal surface of a Supabase Storage bucket client this module depends
+ * on, narrowed so tests can inject a fake without touching the network or
+ * the real SDK. The real `StorageFileApi` returned by
+ * `createClient(...).storage.from(bucket)` structurally satisfies this —
+ * same narrowing approach as `SupabaseClientFactory` in
+ * `worker/services/auth/supabaseAuth.ts`.
+ */
+interface SupabaseStorageBucketApi {
+    upload(
+        path: string,
+        body: Uint8Array,
+        options?: { upsert?: boolean; contentType?: string },
+    ): Promise<{ data: { path: string } | null; error: { message: string } | null }>;
+    download(path: string): Promise<{ data: Blob | null; error: { message: string } | null }>;
+}
+
+export type SupabaseStorageClientFactory = (
+    url: string,
+    serviceRoleKey: string,
+) => {
+    storage: {
+        from(bucket: string): SupabaseStorageBucketApi;
+    };
+};
+
+const defaultStorageClientFactory: SupabaseStorageClientFactory = (url, serviceRoleKey) => createClient(url, serviceRoleKey);
+
+/**
+ * Reads SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY without widening the
+ * generated `Env` type — same indexed-cast precedent as `getSupabaseDbUrl`
+ * (worker/database/pgConnection.ts) and `getConfigValue`
+ * (worker/services/auth/supabaseAuth.ts). A service-role key (not the anon
+ * key) is required: screenshot storage writes/reads run for any app
+ * regardless of which user is browsing, so they must bypass Storage RLS.
+ */
+function getSupabaseStorageConfig(env: Env): { url: string; serviceRoleKey: string } {
+    const source = env as unknown as Record<string, unknown>;
+    const url = source.SUPABASE_URL;
+    const serviceRoleKey = source.SUPABASE_SERVICE_ROLE_KEY;
+    if (typeof url !== 'string' || url.length === 0) {
+        throw new Error('SUPABASE_URL is not configured');
+    }
+    if (typeof serviceRoleKey !== 'string' || serviceRoleKey.length === 0) {
+        throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured');
+    }
+    return { url, serviceRoleKey };
+}
+
+/**
+ * Uploads image bytes to Supabase Storage — the standalone runtime's sibling
+ * to `uploadImageToR2`. Same key scheme (`${type}/${id}/${filename}`), so
+ * the two backends are interchangeable from every caller's perspective.
+ */
+export async function uploadImageToSupabaseStorage(
+    env: Env,
+    image: ImageAttachment,
+    type: ImageType,
+    bytes?: Uint8Array,
+    clientFactory: SupabaseStorageClientFactory = defaultStorageClientFactory,
+): Promise<{ url: string; r2Key: string }> {
+    const data = bytes ?? base64ToUint8Array(image.base64Data!);
+    const key = `${type}/${image.id}/${encodeURIComponent(image.filename)}`;
+
+    const { url: supabaseUrl, serviceRoleKey } = getSupabaseStorageConfig(env);
+    const client = clientFactory(supabaseUrl, serviceRoleKey);
+    const { error } = await client.storage.from(SCREENSHOTS_BUCKET).upload(key, data, {
+        upsert: true,
+        contentType: image.mimeType,
+    });
+    if (error) {
+        throw new Error(`Supabase Storage upload failed: ${error.message}`);
+    }
+
+    return { url: getPublicUrlForR2Image(env, key), r2Key: key };
+}
+
+export async function uploadImage(
+    env: Env,
+    image: ImageAttachment,
+    type: ImageType,
+    storageClientFactory: SupabaseStorageClientFactory = defaultStorageClientFactory,
+): Promise<ProcessedImageAttachment> {
     // Hash in parallel to uploads
     const hashPromise = hashImageB64url(image.base64Data!);
-    // Compute bytes once for both CF Images and R2
+    // Compute bytes once for both CF Images and the storage backend
     const bytes = base64ToUint8Array(image.base64Data!);
 
     // Obtain CF Images URL first (when enabled) so we can pass it into R2 metadata
@@ -157,12 +265,15 @@ export async function uploadImage(env: Env, image: ImageAttachment, type: ImageT
         try {
             cfImagesUrl = await uploadImageToCloudflareImages(env, image, type, bytes);
         } catch (err) {
-            console.warn('Cloudflare Images upload failed, will try R2 fallback', { error: err instanceof Error ? err.message : String(err), image, type });
+            console.warn('Cloudflare Images upload failed, will try storage fallback', { error: err instanceof Error ? err.message : String(err), image, type });
         }
     }
 
-    // Upload to R2 with cfImagesUrl in custom metadata when available
-    const { r2Key, url } = await uploadImageToR2(env, image, type, cfImagesUrl, bytes);
+    // Storage backend: Supabase Storage on the standalone runtime, R2 on
+    // Workers — same seam as buildDrizzle() in worker/database/pgConnection.ts.
+    const { r2Key, url } = isStandaloneRuntime(env)
+        ? await uploadImageToSupabaseStorage(env, image, type, bytes, storageClientFactory)
+        : await uploadImageToR2(env, image, type, cfImagesUrl, bytes);
     const hash = await hashPromise;
 
     return {
@@ -227,4 +338,41 @@ export async function downloadR2Image(env: Env, r2Key: string) : Promise<Process
         publicUrl: cfImagesUrl || getPublicUrlForR2Image(env, r2Key),
         hash: await hashImageB64url(base64),
         mimeType,    }
+}
+
+export interface StoredImageBytes {
+    bytes: Uint8Array;
+    contentType: string | null;
+}
+
+/**
+ * Reads raw stored image bytes for a given storage key
+ * (`${type}/${id}/${filename}`) — Supabase Storage on the standalone
+ * runtime, R2 on Workers. Used by `ScreenshotsController.serveScreenshot` to
+ * serve screenshot bytes directly, independent of which backend stored them.
+ * Never throws for a missing object — returns `null`, mirroring R2's `.get()`
+ * "returns null when absent" contract.
+ */
+export async function getScreenshotBytes(
+    env: Env,
+    key: string,
+    clientFactory: SupabaseStorageClientFactory = defaultStorageClientFactory,
+): Promise<StoredImageBytes | null> {
+    if (isStandaloneRuntime(env)) {
+        const { url, serviceRoleKey } = getSupabaseStorageConfig(env);
+        const client = clientFactory(url, serviceRoleKey);
+        const { data, error } = await client.storage.from(SCREENSHOTS_BUCKET).download(key);
+        if (error || !data) {
+            return null;
+        }
+        const bytes = new Uint8Array(await data.arrayBuffer());
+        return { bytes, contentType: data.type || null };
+    }
+
+    const obj = await env.TEMPLATES_BUCKET.get(key);
+    if (!obj || !obj.body) {
+        return null;
+    }
+    const bytes = new Uint8Array(await obj.arrayBuffer());
+    return { bytes, contentType: obj.httpMetadata?.contentType ?? null };
 }

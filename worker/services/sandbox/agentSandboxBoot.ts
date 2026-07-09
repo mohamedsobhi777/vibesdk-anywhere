@@ -48,6 +48,7 @@ const DEFAULT_EGRESS_ALLOW = [
     'api.cerebras.ai',
     'api.groq.com',
     'gateway.ai.cloudflare.com',
+    'api.cloudflare.com',
 ];
 
 /** Derives the Supabase project host from SUPABASE_URL so PostgREST/Realtime egress is allowed. */
@@ -138,6 +139,17 @@ export async function bootAgentSandbox(opts: {
     }
     if (source.CLOUDFLARE_AI_GATEWAY_TOKEN) {
         envVars.CLOUDFLARE_AI_GATEWAY_TOKEN = source.CLOUDFLARE_AI_GATEWAY_TOKEN;
+    }
+    // Optional: enables screenshot capture (Cloudflare Browser Rendering
+    // REST API, an external HTTPS call — see base.ts's captureScreenshot).
+    // Absent by default so the core generation loop has zero hard
+    // Cloudflare dependency; when both are present, capture works instead
+    // of skipping.
+    if (source.CLOUDFLARE_ACCOUNT_ID) {
+        envVars.CLOUDFLARE_ACCOUNT_ID = source.CLOUDFLARE_ACCOUNT_ID;
+    }
+    if (source.CLOUDFLARE_API_TOKEN) {
+        envVars.CLOUDFLARE_API_TOKEN = source.CLOUDFLARE_API_TOKEN;
     }
 
     const sandbox = await api.create({

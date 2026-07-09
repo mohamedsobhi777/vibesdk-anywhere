@@ -22,6 +22,8 @@ export interface BootstrapEnv {
 	selfPreviewBaseUrl?: string;
 	cloudflareAiGatewayUrl?: string;
 	cloudflareAiGatewayToken?: string;
+	cloudflareAccountId?: string;
+	cloudflareApiToken?: string;
 }
 
 /**
@@ -74,5 +76,7 @@ export function parseBootstrapEnv(source: Record<string, string | undefined>): B
 		selfPreviewBaseUrl: source.SELF_PREVIEW_BASE_URL,
 		cloudflareAiGatewayUrl: source.CLOUDFLARE_AI_GATEWAY_URL,
 		cloudflareAiGatewayToken: source.CLOUDFLARE_AI_GATEWAY_TOKEN,
+		cloudflareAccountId: source.CLOUDFLARE_ACCOUNT_ID,
+		cloudflareApiToken: source.CLOUDFLARE_API_TOKEN,
 	};
 }

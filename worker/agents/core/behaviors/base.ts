@@ -1806,6 +1806,17 @@ export abstract class BaseCodingBehavior<TState extends BaseProjectState>
             throw new Error(error);
         }
 
+        // Screenshot capture is optional: it calls the Cloudflare Browser
+        // Rendering REST API (a hosted HTTPS endpoint, not a Workers
+        // binding), which works from Bun but still needs Cloudflare
+        // credentials. Skip gracefully rather than throwing so the core
+        // generation loop has zero hard Cloudflare dependency when those
+        // credentials are absent (e.g. the standalone runtime by default).
+        if (!this.env.CLOUDFLARE_ACCOUNT_ID || !this.env.CLOUDFLARE_API_TOKEN) {
+            this.logger.info('Skipping screenshot capture: CLOUDFLARE_ACCOUNT_ID/CLOUDFLARE_API_TOKEN not configured');
+            return '';
+        }
+
         this.logger.info('Capturing screenshot via REST API', { url, viewport });
 
         // Notify start of screenshot capture

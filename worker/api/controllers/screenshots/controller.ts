@@ -3,6 +3,7 @@ import type { ControllerResponse, ApiResponse } from '../types';
 import type { RouteContext } from '../../types/route-context';
 import { createLogger } from '../../../logger';
 import { ScreenshotSecurity } from '../../../utils/screenshot-security';
+import { getScreenshotBytes } from '../../../utils/images';
 
 // -------------------------
 // Helpers
@@ -90,12 +91,12 @@ export class ScreenshotsController extends BaseController {
             }
 
             const key = `screenshots/${appId}/${validatedFile}`;
-            const obj = await env.TEMPLATES_BUCKET.get(key);
-            if (!obj || !obj.body) {
+            const stored = await getScreenshotBytes(env, key);
+            if (!stored) {
                 return ScreenshotsController.createErrorResponse('Screenshot not found', 404);
             }
 
-            const contentType = obj.httpMetadata?.contentType || getMimeByExtension(validatedFile) || 'image/png';
+            const contentType = stored.contentType || getMimeByExtension(validatedFile) || 'image/png';
             const headers = new Headers({
                 'Content-Type': contentType,
                 'Cache-Control': 'public, max-age=21600',
@@ -104,7 +105,7 @@ export class ScreenshotsController extends BaseController {
 
 			// We return a naked Response because our controller helper types expect JSON, but this route is binary.
 			// It's safe because the router uses this Response directly.
-			return new Response(obj.body, {
+			return new Response(stored.bytes, {
 				headers,
 			}) as unknown as ControllerResponse<ApiResponse<never>>;
 		        } catch (error) {

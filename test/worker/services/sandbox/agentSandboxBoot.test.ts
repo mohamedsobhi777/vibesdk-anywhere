@@ -124,6 +124,35 @@ describe('bootAgentSandbox', () => {
         expect(fakeWith.createCalls[0].envVars?.CLOUDFLARE_AI_GATEWAY_TOKEN).toBe('gw-token');
     });
 
+    it('adds CLOUDFLARE_ACCOUNT_ID/CLOUDFLARE_API_TOKEN envVars only when present in env', async () => {
+        const fakeWithout = makeFakeApi();
+        await bootAgentSandbox({
+            sessionId: 'session-9',
+            agentId: 'agent-9',
+            sessionJwt: 'jwt-9',
+            env: BASE_ENV,
+            api: fakeWithout,
+        });
+        expect(fakeWithout.createCalls[0].envVars?.CLOUDFLARE_ACCOUNT_ID).toBeUndefined();
+        expect(fakeWithout.createCalls[0].envVars?.CLOUDFLARE_API_TOKEN).toBeUndefined();
+
+        const fakeWith = makeFakeApi();
+        const envWithScreenshotCreds = {
+            ...BASE_ENV,
+            CLOUDFLARE_ACCOUNT_ID: 'cf-account-id',
+            CLOUDFLARE_API_TOKEN: 'cf-api-token',
+        } as unknown as Env;
+        await bootAgentSandbox({
+            sessionId: 'session-10',
+            agentId: 'agent-10',
+            sessionJwt: 'jwt-10',
+            env: envWithScreenshotCreds,
+            api: fakeWith,
+        });
+        expect(fakeWith.createCalls[0].envVars?.CLOUDFLARE_ACCOUNT_ID).toBe('cf-account-id');
+        expect(fakeWith.createCalls[0].envVars?.CLOUDFLARE_API_TOKEN).toBe('cf-api-token');
+    });
+
     it('allows egress to the Supabase project host plus the default allowlist', async () => {
         const fake = makeFakeApi();
 
@@ -138,6 +167,7 @@ describe('bootAgentSandbox', () => {
         const allowOut = fake.createCalls[0].network?.allowOut ?? [];
         expect(allowOut).toContain('xyzcompany.supabase.co');
         expect(allowOut).toContain('registry.npmjs.org');
+        expect(allowOut).toContain('api.cloudflare.com');
     });
 
     it('starts the agent process detached via setsid/nohup with a 15s timeout', async () => {

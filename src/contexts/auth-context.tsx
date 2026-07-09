@@ -46,12 +46,15 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Supabase Auth is provisioned with Google, GitHub, and email/password
-// enabled for this app. The `/api/auth/providers` endpoint this used to be
-// fetched from is retired, so the config is static.
+// Supabase email/password is always available. Google/GitHub only work once
+// you enable AND configure them in the Supabase dashboard (Authentication ->
+// Providers); showing their buttons otherwise just yields Supabase's
+// "provider is not enabled" error. So gate the social buttons on build-time
+// flags (default off) — set VITE_AUTH_GOOGLE=true / VITE_AUTH_GITHUB=true and
+// rebuild once the provider is enabled in Supabase.
 const DEFAULT_AUTH_PROVIDERS: { google: boolean; github: boolean; email: boolean } = {
-  google: true,
-  github: true,
+  google: import.meta.env.VITE_AUTH_GOOGLE === 'true',
+  github: import.meta.env.VITE_AUTH_GITHUB === 'true',
   email: true,
 };
 
@@ -278,7 +281,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isLoading,
     error,
     authProviders: DEFAULT_AUTH_PROVIDERS,
-    hasOAuth: true,
+    hasOAuth: DEFAULT_AUTH_PROVIDERS.google || DEFAULT_AUTH_PROVIDERS.github,
     requiresEmailAuth: true,
     login, // OAuth method with redirect support
     loginWithEmail, // Email/password method

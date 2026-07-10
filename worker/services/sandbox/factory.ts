@@ -1,45 +1,33 @@
 import { BaseSandboxService } from "./BaseSandboxService";
-import { getRuntimeEnv } from "worker/utils/runtimeEnv";
 
 let sandboxServiceFactoryOverride: ((sessionId: string, agentId: string) => BaseSandboxService) | null = null;
 
 /**
- * Override hook so non-Workers runtimes (e.g. standalone Bun agent runtime)
- * can supply their own BaseSandboxService factory without this module's
- * Workers-only branch (and the Workers-only client modules it loads)
- * ever executing.
+ * Override hook the runtime uses to supply its BaseSandboxService
+ * implementation. The standalone Bun agent runtime installs
+ * `LocalSandboxService` here (see agent-runtime/src/standaloneAgent.ts) before
+ * any sandbox call is made. There is no built-in default: the Cloudflare
+ * Containers client (`SandboxSdkClient`) was removed with the rest of the CF
+ * stack, so a runtime that reaches sandbox code without installing an override
+ * is a wiring bug, surfaced loudly below rather than silently no-op'd.
  */
 export function setSandboxServiceFactory(factory: (sessionId: string, agentId: string) => BaseSandboxService): void {
     sandboxServiceFactoryOverride = factory;
 }
 
 /**
- * `SandboxSdkClient`/`RemoteSandboxServiceClient` are imported dynamically
- * (rather than statically at module top) so that under a non-Workers
- * runtime with an override installed, their modules — which read
- * `cloudflare:workers` at module scope, unresolvable under Bun — are never
- * loaded at all. `getSandboxService` is async solely to allow this; the
- * override branch below still resolves synchronously-fast (no real await),
- * and every caller in this codebase already awaits the result (see
- * DeploymentManager.getClient and BaseCodingBehavior.getSandboxServiceClient).
+ * Resolves the runtime's sandbox service via the installed override.
+ * Kept async because every caller already awaits it (DeploymentManager.getClient,
+ * BaseCodingBehavior.getSandboxServiceClient) and to preserve the call-site
+ * contract from when implementations were dynamically imported.
  */
 export async function getSandboxService(sessionId: string, agentId: string): Promise<BaseSandboxService> {
     if (sandboxServiceFactoryOverride) {
         return sandboxServiceFactoryOverride(sessionId, agentId);
     }
-    // Read env lazily, only on this Workers-only branch, via the
-    // runtimeEnv seam (worker/utils/runtimeEnv.ts) rather than a top-level
-    // `import { env } from 'cloudflare:workers'` — that import is
-    // unresolvable under Bun and previously executed unconditionally at
-    // module load, before any override hook could run. See
-    // worker/services/sandbox/templateSource.ts for the same idiom.
-    const env = getRuntimeEnv();
-    if (env.SANDBOX_SERVICE_TYPE == 'runner') {
-        console.log("[getSandboxService] Using runner service for sandboxing");
-        const { RemoteSandboxServiceClient } = await import("./remoteSandboxService");
-        return new RemoteSandboxServiceClient(sessionId);
-    }
-    console.log("[getSandboxService] Using sandboxsdk service for sandboxing");
-    const { SandboxSdkClient } = await import("./sandboxSdkClient");
-    return new SandboxSdkClient(sessionId, agentId);
+    throw new Error(
+        'No sandbox service is configured: the runtime must install one via ' +
+        'setSandboxServiceFactory() before requesting a sandbox (the standalone ' +
+        'agent runtime installs LocalSandboxService at boot).',
+    );
 }

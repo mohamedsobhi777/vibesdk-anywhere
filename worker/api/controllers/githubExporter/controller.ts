@@ -2,7 +2,6 @@ import { BaseController } from '../baseController';
 import { RouteContext } from '../../types/route-context';
 import { GitHubService } from '../../../services/github';
 import { GitHubExporterOAuthProvider } from '../../../services/oauth/github-exporter';
-import { getAgentStub } from '../../../agents';
 import { createLogger } from '../../../logger';
 import { AppService } from '../../../database/services/AppService';
 import { AgentSessionService } from '../../../database/services/AgentSessionService';
@@ -419,45 +418,12 @@ export class GitHubExporterController extends BaseController {
                 );
             }
 
-            const agentStub = await getAgentStub(env, body.agentId);
-            const cachedToken = await agentStub.getGitHubToken();
-            
-            if (cachedToken) {
-                this.logger.info('Using cached token', { agentId: body.agentId, username: cachedToken.username });
-                
-                const result = await this.createRepositoryAndPush({
-                    env,
-                    agentId: body.agentId,
-                    repositoryName: body.repositoryName,
-                    description: body.description,
-                    isPrivate: body.isPrivate ?? false,
-                    token: cachedToken.token,
-                    username: cachedToken.username
-                });
-                
-                if (result.success) {
-                    this.logger.info('Direct export completed', { repositoryUrl: result.repositoryUrl, agentId: body.agentId });
-                    return GitHubExporterController.createSuccessResponse({
-                        success: true,
-                        repositoryUrl: result.repositoryUrl,
-                        skippedOAuth: true
-                    });
-                }
-                
-                const isTemporaryError = result.error?.includes('rate limit') || 
-                                        result.error?.includes('timeout') ||
-                                        result.error?.includes('ECONNRESET');
-                
-                if (isTemporaryError) {
-                    this.logger.warn('Temporary error, keeping token', { error: result.error, agentId: body.agentId });
-                    return GitHubExporterController.createErrorResponse(
-                        result.error || 'Temporary GitHub error',
-                        503
-                    );
-                }
-            } else {
-                this.logger.info('No cached token, initiating OAuth', { agentId: body.agentId });
-            }
+            // GitHub token caching lived in the per-agent Durable Object, which
+            // was removed with the Cloudflare stack. Without a token cache every
+            // export goes through the OAuth flow below; the cached-token
+            // fast-path (direct push, skipping OAuth) is a follow-up once token
+            // caching is reimplemented on the Phoenix stack.
+            this.logger.info('Initiating OAuth for export', { agentId: body.agentId });
 
             const baseUrl = new URL(request.url).origin;
             const rawReturnUrl = request.headers.get('referer') || `${baseUrl}/chat`;
@@ -529,59 +495,15 @@ export class GitHubExporterController extends BaseController {
                 );
             }
 
-            const agentStub = await getAgentStub(env, body.agentId);
-            
-            // Try to get cached token
-            const cachedToken = await agentStub.getGitHubToken();
-            
-            if (!cachedToken) {
-                return GitHubExporterController.createErrorResponse<never>(
-                    'No cached GitHub token. Please re-authenticate.',
-                    401
-                );
-            }
-
-            // Export git objects from the agent's Superserve sandbox (real
-            // git on disk) rather than the retired Durable Object RPC
-            // (agentStub.exportGitObjects). templateDetails is intentionally
-            // null - see the comment in createRepositoryAndPush above.
-            const session = await new AgentSessionService(env).getAgentSession(body.agentId);
-            if (!session?.sandboxId) {
-                return GitHubExporterController.createErrorResponse<never>(
-                    'Agent sandbox not found for this app',
-                    404
-                );
-            }
-            const [gitObjects, agentState] = await Promise.all([
-                extractSandboxGitObjects(session.sandboxId, env),
-                new AgentStateService(env).getAgentState(body.agentId),
-            ]);
-            const query = agentState?.query ?? '';
-            const templateDetails = null;
-
-            // Get app createdAt
-            let appCreatedAt: Date | undefined;
-            try {
-                const appService = new AppService(env);
-                const app = await appService.getAppDetails(body.agentId);
-                if (app && app.createdAt) {
-                    appCreatedAt = new Date(app.createdAt);
-                }
-            } catch (error) {
-                this.logger.warn('Failed to get app createdAt for sync check', { error });
-            }
-            
-            // Check remote status
-            const status = await GitHubService.checkRemoteStatus({
-                gitObjects,
-                templateDetails,
-                appQuery: query,
-                appCreatedAt,
-                repositoryUrl: body.repositoryUrl,
-                token: cachedToken.token
-            });
-
-            return GitHubExporterController.createSuccessResponse(status);
+            // GitHub token caching lived in the per-agent Durable Object,
+            // removed with the Cloudflare stack. Remote-status checking needs a
+            // GitHub token, which is no longer cached, so this requires a fresh
+            // OAuth. Reinstating cached-token status checks is a follow-up once
+            // token caching is reimplemented on the Phoenix stack.
+            return GitHubExporterController.createErrorResponse<never>(
+                'No cached GitHub token. Please re-authenticate.',
+                401
+            );
         } catch (error) {
             this.logger.error('Failed to check remote status', error);
             return GitHubExporterController.createErrorResponse<never>(

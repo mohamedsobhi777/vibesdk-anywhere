@@ -4,7 +4,7 @@ import { AuthUser } from '../../types/auth-types';
 import { extractTokenWithMetadata, extractRequestMetadata } from '../../utils/authUtils';
 import { captureSecurityEvent } from '../../observability/sentry';
 import { KVRateLimitStore } from './KVRateLimitStore';
-import type { RateLimitConfig, RateLimitResult } from './DORateLimitStore';
+import type { RateLimitConfig, RateLimitResult } from './types';
 import * as pgRateLimitStore from './pgRateLimitStore';
 import { createDatabaseService } from '../../database';
 import { RateLimitExceededError, SecurityError } from 'shared/types/errors';

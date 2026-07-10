@@ -43,7 +43,7 @@
 import { and, eq, gte, lte, lt, sql } from 'drizzle-orm';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import * as schema from '../../database/schema';
-import type { RateLimitConfig, RateLimitResult } from './DORateLimitStore';
+import type { RateLimitConfig, RateLimitResult } from './types';
 
 type Db = PostgresJsDatabase<typeof schema>;
 

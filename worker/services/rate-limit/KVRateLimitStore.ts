@@ -1,6 +1,6 @@
 import { createObjectLogger } from '../../logger';
 import { KVRateLimitConfig } from './config';
-import type { RateLimitResult } from './DORateLimitStore';
+import type { RateLimitResult } from './types';
 
 export class KVRateLimitStore {
 	static logger = createObjectLogger(this, 'KVRateLimitStore');

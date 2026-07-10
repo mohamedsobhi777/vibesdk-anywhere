@@ -1,13 +1,12 @@
 /**
- * Minimal test worker entry point.
- * Only exports Durable Objects needed for testing to avoid loading
- * problematic dependencies (like MCP SDK) that don't work in workerd test env.
+ * Minimal test worker entry point for the vitest-pool-workers runtime.
+ * The Cloudflare deployment path and its Durable Objects were removed, so this
+ * exports no DOs — it exists only to give the workerd test pool a module to
+ * load and to wire the runtime-env seam.
  */
 import { env as workerGlobalEnv } from 'cloudflare:workers';
 import { setRuntimeEnv } from '../worker/utils/runtimeEnv';
 setRuntimeEnv(workerGlobalEnv);
-
-export { UserSecretsStore } from '../worker/services/secrets/UserSecretsStore';
 
 export default {
 	async fetch() {

@@ -78,11 +78,6 @@ export class RateLimitService {
         };
 
         try {
-            if (env.DORateLimitStore) {
-                const stub = env.DORateLimitStore.getByName(key);
-                return await stub.increment(key, bucketConfig, incrementBy);
-            }
-
             const db = createDatabaseService(env).db;
             return await pgRateLimitStore.increment(db, key, bucketConfig, incrementBy);
         } catch (error) {
@@ -291,14 +286,8 @@ export class RateLimitService {
 		};
 
 		try {
-			let remaining: number;
-			if (env.DORateLimitStore) {
-				const stub = env.DORateLimitStore.getByName(key);
-				remaining = await stub.getRemainingLimit(key, bucketConfig);
-			} else {
-				const db = createDatabaseService(env).db;
-				remaining = await pgRateLimitStore.getRemainingLimit(db, key, bucketConfig);
-			}
+			const db = createDatabaseService(env).db;
+			const remaining = await pgRateLimitStore.getRemainingLimit(db, key, bucketConfig);
 
 			return {
 				remaining,

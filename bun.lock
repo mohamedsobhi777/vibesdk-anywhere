@@ -11,9 +11,7 @@
         "@babel/parser": "^7.28.5",
         "@babel/traverse": "^7.28.5",
         "@babel/types": "^7.28.5",
-        "@cloudflare/containers": "^0.0.28",
         "@cloudflare/puppeteer": "^1.0.4",
-        "@cloudflare/sandbox": "0.5.6",
         "@cloudflare/think": "^0.8.6",
         "@commitlint/config-conventional": "^20.2.0",
         "@hono/node-server": "^2.0.8",
@@ -187,7 +185,6 @@
     },
   },
   "overrides": {
-    "@cloudflare/containers": "^0.0.28",
     "vite": "npm:rolldown-vite@latest",
   },
   "packages": {
@@ -343,13 +340,9 @@
 
     "@cloudflare/codemode": ["@cloudflare/codemode@0.3.8", "", { "dependencies": { "@types/json-schema": "^7.0.15", "acorn": "^8.16.0" }, "peerDependencies": { "@modelcontextprotocol/sdk": "^1.25.0", "@tanstack/ai": ">=0.8.0 <1.0.0", "ai": "^6.0.0", "zod": "^4.0.0" }, "optionalPeers": ["@modelcontextprotocol/sdk", "@tanstack/ai", "ai", "zod"] }, "sha512-PVe99dFf/dvf0JOh1SBTYL7YT0nXusmqaK0lRrrlHGIQdGAnKRSb4VtaE5atiDVgN/U9G16bSkej7Pn5lWhG1g=="],
 
-    "@cloudflare/containers": ["@cloudflare/containers@0.0.28", "", {}, "sha512-wzR9UWcGvZ9znd4elkXklilPcHX6srncsjSkx696SZRZyTygNbWsLlHegvc1C+e9gn28HRZU3dLiAzXiC9IY1w=="],
-
     "@cloudflare/kv-asset-handler": ["@cloudflare/kv-asset-handler@0.5.0", "", {}, "sha512-jxQYkj8dSIzc0cD6cMMNdOc1UVjqSqu8BZdor5s8cGjW2I8BjODt/kWPVdY+u9zj3ms75Q5qaZgnxUad83+eAg=="],
 
     "@cloudflare/puppeteer": ["@cloudflare/puppeteer@1.1.0", "", { "dependencies": { "@puppeteer/browsers": "2.2.4", "debug": "^4.3.5", "devtools-protocol": "0.0.1299070", "ws": "^8.18.0" } }, "sha512-lN10En49avRDQvz8Gpv/WiIoGvjjDiP6P+v2y9bA6rfPT5WHfnlg2O6MwjHc1POm8A9LXf1sMdgrsdW8xWapOw=="],
-
-    "@cloudflare/sandbox": ["@cloudflare/sandbox@0.5.6", "", { "dependencies": { "@cloudflare/containers": "^0.0.30" }, "peerDependencies": { "@openai/agents": "^0.3.3" }, "optionalPeers": ["@openai/agents"] }, "sha512-N4mdUY5lVWQHQcAZnTecJne95uSyf7KVPbJGMr3G6jS7oyphriw6Hxa5I/HlDUdMWjaTBgeOuDEb4m3wo2IyOg=="],
 
     "@cloudflare/shell": ["@cloudflare/shell@0.3.9", "", { "dependencies": { "@cloudflare/codemode": "^0.3.8", "isomorphic-git": "^1.38.4" } }, "sha512-b3z4uYvqlcuQoKKdQ4DHLxHwFTKu+gWenPd7yQoecD5A+tTkZpW350TRXfXIZ8avc4DODAL0nJF0Q0qCVGSksw=="],
 

@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { MockInstance } from 'vitest';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import * as schema from '../../../../worker/database/schema';
 import * as databaseModule from '../../../../worker/database';
@@ -215,36 +214,17 @@ function buildSettings(overrides: {
 	};
 }
 
-interface FakeDOStub {
-	increment: MockInstance<(key: string, config: unknown, incrementBy: number) => Promise<{ success: boolean; remainingLimit?: number }>>;
-	getRemainingLimit: MockInstance<(key: string, config: unknown) => Promise<number>>;
-}
-
-/** Env shaped like Vercel/standalone: the `DORateLimitStore` Durable Object binding is simply absent. */
+/** Env for the Phoenix stack: rate limiting always runs against Postgres (no DO binding). */
 function buildEnvWithoutDO(): Env {
 	return {} as unknown as Env;
 }
 
-/** Env shaped like Workers: `DORateLimitStore` resolves to a fake stub that records every call. */
-function buildEnvWithDOStub(cannedIncrement: { success: boolean; remainingLimit?: number }, cannedRemaining: number): { env: Env; stub: FakeDOStub } {
-	const stub: FakeDOStub = {
-		increment: vi.fn(async () => cannedIncrement),
-		getRemainingLimit: vi.fn(async () => cannedRemaining),
-	};
-	const env = {
-		DORateLimitStore: {
-			getByName: vi.fn(() => stub),
-		},
-	} as unknown as Env;
-	return { env, stub };
-}
-
-describe('RateLimitService - store selection (DO stub vs. pgRateLimitStore)', () => {
+describe('RateLimitService - Postgres store', () => {
 	afterEach(() => {
 		vi.restoreAllMocks();
 	});
 
-	describe('env.DORateLimitStore absent (Vercel / standalone)', () => {
+	describe('rate limiting via the Postgres store', () => {
 		it('enforce() increments via the Postgres store and denies once the limit is reached', async () => {
 			const fakeDb = asDb(createFakeDb());
 			vi.spyOn(databaseModule, 'createDatabaseService').mockReturnValue({ db: fakeDb } as unknown as DatabaseService);
@@ -298,36 +278,6 @@ describe('RateLimitService - store selection (DO stub vs. pgRateLimitStore)', ()
 			const credits = await RateLimitService.getRemainingCredits(env, settings, userId);
 
 			expect(credits).toEqual({ remaining: 5, limit: 10, dailyLimit: undefined });
-		});
-	});
-
-	describe('env.DORateLimitStore present (Workers)', () => {
-		it('enforce() calls the Durable Object stub and never touches the Postgres store', async () => {
-			const createDatabaseServiceSpy = vi.spyOn(databaseModule, 'createDatabaseService');
-			const { env, stub } = buildEnvWithDOStub({ success: true, remainingLimit: 99 }, 0);
-			const settings = buildSettings({});
-			const key = RateLimitService.buildRateLimitKey(RateLimitType.APP_CREATION, 'user:do-enforce-test');
-
-			const result = await RateLimitService.enforce(env, key, settings, RateLimitType.APP_CREATION, 1);
-
-			expect(result).toEqual({ success: true, remainingLimit: 99 });
-			expect(stub.increment).toHaveBeenCalledWith(key, expect.objectContaining({ limit: 2, period: 3600 }), 1);
-			expect(createDatabaseServiceSpy).not.toHaveBeenCalled();
-		});
-
-		it('getRemainingCredits() calls the Durable Object stub and never touches the Postgres store', async () => {
-			const createDatabaseServiceSpy = vi.spyOn(databaseModule, 'createDatabaseService');
-			const { env, stub } = buildEnvWithDOStub({ success: true }, 77);
-			const settings = buildSettings({});
-
-			const credits = await RateLimitService.getRemainingCredits(env, settings, 'do-credits-test');
-
-			expect(credits).toEqual({ remaining: 77, limit: 10, dailyLimit: undefined });
-			expect(stub.getRemainingLimit).toHaveBeenCalledWith(
-				RateLimitService.buildRateLimitKey(RateLimitType.LLM_CALLS, 'user:do-credits-test'),
-				expect.objectContaining({ limit: 10, period: 3600 }),
-			);
-			expect(createDatabaseServiceSpy).not.toHaveBeenCalled();
 		});
 	});
 });

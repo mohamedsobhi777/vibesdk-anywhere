@@ -1,7 +1,5 @@
 import { defineWorkersConfig } from '@cloudflare/vitest-pool-workers/config';
 
-const runIntegrationTests = process.env.VIBESDK_RUN_INTEGRATION_TESTS === '1';
-
 export default defineWorkersConfig({
   resolve: {
     alias: {
@@ -16,8 +14,6 @@ export default defineWorkersConfig({
         ssr: {
           enabled: true,
           include: [
-            '@cloudflare/containers',
-            '@cloudflare/sandbox',
             '@babel/traverse',
             '@babel/types',
           ],
@@ -43,7 +39,6 @@ export default defineWorkersConfig({
       '**/test/worker-entry.ts',
       '**/container/monitor-cli.test.ts',
       '**/cf-git/**',
-      '**/sdk/test/**', // SDK tests run with bun test, not vitest
       '**/agent-runtime/**',
       // Proves createApp() is loadable under a genuine non-workerd runtime
       // (Vercel/Node has no `cloudflare:workers`); this pool runs inside
@@ -61,7 +56,6 @@ export default defineWorkersConfig({
       // identical failure on vercelHandler.test.ts alone when temporarily
       // un-excluded. Runs via `bun test` instead, same as that file.
       '**/test/worker/api/capabilities.test.ts',
-      ...(runIntegrationTests ? [] : ['**/sdk/test/integration/**']),
     ],
   },
 });

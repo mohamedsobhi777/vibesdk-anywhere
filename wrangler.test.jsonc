@@ -1,25 +1,9 @@
 {
 	"name": "vibesdk-test",
 	"compatibility_date": "2024-12-12",
-	"main": "worker/index.ts",
+	"main": "test/worker-entry.ts",
 	"compatibility_flags": ["nodejs_compat"],
 	"send_metrics": false,
-	"durable_objects": {
-		"bindings": [
-			{
-				"class_name": "UserSecretsStore",
-				"name": "UserSecretsStore"
-			}
-		]
-	},
-	"migrations": [
-		{
-			"new_sqlite_classes": [
-				"UserSecretsStore"
-			],
-			"tag": "v1"
-		}
-	],
 	"vars": {
 		"SECRETS_ENCRYPTION_KEY": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	}

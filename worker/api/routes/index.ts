@@ -2,7 +2,6 @@ import { setupAppRoutes } from './appRoutes';
 import { setupUserRoutes } from './userRoutes';
 import { setupAnalyticsRoutes } from './analyticsRoutes';
 import { setupSecretsRoutes } from './secretsRoutes';
-// import { setupUserSecretsRoutes } from './userSecretsRoutes';
 import { setupModelConfigRoutes } from './modelConfigRoutes';
 import { setupModelProviderRoutes } from './modelProviderRoutes';
 import { setupGitHubExporterRoutes } from './githubExporterRoutes';
@@ -10,7 +9,6 @@ import { setupCodegenRoutes } from './codegenRoutes';
 import { setupScreenshotRoutes } from './imagesRoutes';
 import { setupSentryRoutes } from './sentryRoutes';
 import { setupCapabilitiesRoutes } from './capabilitiesRoutes';
-import { setupTicketRoutes } from './ticketRoutes';
 import { setupLimitsRoutes } from './limitsRoutes';
 import { Hono } from "hono";
 import { AppEnv } from "../../types/appenv";
@@ -55,9 +53,6 @@ export function setupRoutes(app: Hono<AppEnv>): void {
     // management routes were retired with CloudflareAccountService (the
     // cloudflareAccounts/aiGateways tables are deferred).
 
-    // WebSocket ticket routes
-    setupTicketRoutes(app);
-
     // Codegen routes
     setupCodegenRoutes(app);
 
@@ -76,9 +71,6 @@ export function setupRoutes(app: Hono<AppEnv>): void {
     // Secrets management routes (static templates only - legacy D1-based
     // CRUD routes were retired along with the D1 secrets store)
     setupSecretsRoutes(app);
-
-    // User secrets vault routes (DO-coupled - deferred)
-    // setupUserSecretsRoutes(app);
 
     // Model configuration and provider keys routes
     setupModelConfigRoutes(app);

@@ -18,21 +18,16 @@
 		"typecheck:agent-runtime": "! tsc -p agent-runtime --noEmit --pretty false 2>&1 | grep -E '^agent-runtime/'",
 		"lint": "eslint .",
 		"preview": "npm run build && vite preview",
-		"deploy": "bun --env-file .prod.vars scripts/deploy.ts",
 		"cli": "tsx --tsconfig tsconfig.app.json cli/index.ts",
 		"tui": "tsx --tsconfig tsconfig.app.json cli/tui.tsx",
-		"cf-typegen": "wrangler types --include-runtime false",
 		"test": "vitest run",
 		"test:agent-runtime": "bun test agent-runtime",
-		"test:integration": "VIBESDK_RUN_INTEGRATION_TESTS=1 vitest run sdk/test/integration/integration.test.ts",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",
 		"test:bun": "bun run vitest run",
 		"test:bun:watch": "bun run vitest",
 		"db:generate": "drizzle-kit generate --config=drizzle.config.local.ts",
 		"db:generate:remote": "drizzle-kit generate --config=drizzle.config.remote.ts",
-		"db:migrate:local": "wrangler d1 migrations apply vibesdk-db --local",
-		"db:migrate:remote": "CI=true wrangler d1 migrations apply vibesdk-db --remote",
 		"db:studio": "drizzle-kit studio --config=drizzle.config.local.ts",
 		"db:studio:remote": "drizzle-kit studio --config=drizzle.config.remote.ts",
 		"db:drop": "drizzle-kit drop --config=drizzle.config.local.ts",
@@ -53,9 +48,7 @@
 		"@babel/parser": "^7.28.5",
 		"@babel/traverse": "^7.28.5",
 		"@babel/types": "^7.28.5",
-		"@cloudflare/containers": "^0.0.28",
 		"@cloudflare/puppeteer": "^1.0.4",
-		"@cloudflare/sandbox": "0.5.6",
 		"@cloudflare/think": "^0.8.6",
 		"@commitlint/config-conventional": "^20.2.0",
 		"@hono/node-server": "^2.0.8",
@@ -193,7 +186,6 @@
 		"useTabs": true
 	},
 	"overrides": {
-		"vite": "npm:rolldown-vite@latest",
-		"@cloudflare/containers": "^0.0.28"
+		"vite": "npm:rolldown-vite@latest"
 	}
 }

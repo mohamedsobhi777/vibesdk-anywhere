@@ -14,7 +14,6 @@ import { AppEnv } from '../../types/appenv';
 import { RateLimitExceededError } from 'shared/types/errors';
 import * as Sentry from '@sentry/cloudflare';
 import { getUserConfigurableSettings } from 'worker/config';
-import { authenticateViaTicket, hasTicketParam } from './ticketAuth';
 
 const logger = createLogger('RouteAuth');
 
@@ -159,8 +158,7 @@ export async function enforceAuthRequirement(c: Context<AppEnv>) : Promise<Respo
     let user: AuthUser | null = c.get('user') || null;
 
     const requirement = c.get('authLevel') as AuthRequirement | undefined;
-    const authOptions = c.get('authLevelOptions') as AuthLevelOptions | undefined;
-    
+
     if (!requirement) {
         logger.error('No authentication level found');
         return errorResponse('No authentication level found', 500);
@@ -168,31 +166,10 @@ export async function enforceAuthRequirement(c: Context<AppEnv>) : Promise<Respo
     
     // Only perform auth if we need it or don't have user yet
     if (!user && (requirement.level === 'authenticated' || requirement.level === 'owner-only')) {
-        const request = c.req.raw;
-        const env = c.env;
-        const params = c.req.param();
-        
-        // Strategy 1: Ticket-based auth (if configured and ticket present)
-        if (authOptions?.ticketAuth && hasTicketParam(request)) {
-            const ticketAuth = await authenticateViaTicket(request, env, authOptions.ticketAuth, params);
-            if (ticketAuth) {
-                user = ticketAuth.user;
-                c.set('user', user);
-                c.set('sessionId', ticketAuth.sessionId);
-                Sentry.setUser({ id: user.id, email: user.email });
-                
-                const config = await getUserConfigurableSettings(c.env, user.id);
-                c.set('config', config);
-                
-                // Skip rate limiting for ticket auth (already rate-limited at ticket creation)
-                logger.info('Authenticated via ticket', { userId: user.id, resourceType: authOptions.ticketAuth.resourceType });
-            } else {
-                // Ticket was provided but invalid - reject immediately
-                return errorResponse('Invalid or expired ticket', 403);
-            }
-        }
-        
-        // Strategy 2: Standard JWT auth (header/cookie)
+        // Standard JWT auth (header/cookie). Ticket-based auth (WebSocket
+        // tickets resolved against the per-agent/vault Durable Objects) was
+        // removed with the Cloudflare stack; the browser authenticates the
+        // Supabase Realtime channel with a session JWT instead.
         if (!user) {
             const userSession = await authMiddleware(c.req.raw, c.env);
             if (!userSession) {

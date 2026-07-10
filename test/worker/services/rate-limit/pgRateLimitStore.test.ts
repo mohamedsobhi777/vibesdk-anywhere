@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import * as schema from 'worker/database/schema';
-import type { RateLimitConfig, RateLimitResult } from 'worker/services/rate-limit/DORateLimitStore';
+import type { RateLimitConfig, RateLimitResult } from 'worker/services/rate-limit/types';
 
 /**
  * `eq`/`and`/`gte`/`lte`/`lt`/`sql` normally compile to SQL fragments that

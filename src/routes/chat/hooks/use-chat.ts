@@ -20,7 +20,7 @@ import { logger } from '@/utils/logger';
 import { mergeFiles } from '@/utils/file-helpers';
 import { apiClient } from '@/lib/api-client';
 import { appEvents } from '@/lib/app-events';
-import { supabase } from '@/lib/supabase';
+import { agentRealtime } from '@/lib/supabase';
 import { createWebSocketMessageHandler, type HandleMessageDeps, type BackendErrorDialogState } from '../utils/handle-websocket-message';
 import { isConversationalMessage, addOrUpdateMessage, createUserMessage, handleRateLimitError, createAIMessage, type ChatMessage } from '../utils/message-helpers';
 import { sendWebSocketMessage } from '../utils/websocket-helpers';
@@ -368,8 +368,8 @@ export function useChat({
 				},
 			};
 
-			await supabase.realtime.setAuth(token);
-			const channel = supabase.channel(realtimeChannel, {
+			await agentRealtime.realtime.setAuth(token);
+			const channel = agentRealtime.channel(realtimeChannel, {
 				config: { broadcast: { self: false }, private: true },
 			});
 			channelRef.current = channel;
@@ -396,14 +396,38 @@ export function useChat({
 					setWebsocket(shim as unknown as WebSocket);
 					openListeners.forEach((listener) => listener());
 
+					// Supabase Realtime can silently drop a broadcast sent at the
+					// exact SUBSCRIBED instant, before the broadcast pipe is fully
+					// ready. The initial get_conversation_state / generate_all are
+					// sent here, so losing them means the agent never starts
+					// generating. channel.send() resolves to 'ok' once the server
+					// acknowledges the broadcast, so retry until acknowledged.
+					const reliableSend = async (type: string) => {
+						const raw = JSON.stringify({ type });
+						for (let attempt = 0; attempt < 6; attempt++) {
+							try {
+								const res = await channel.send({
+									type: 'broadcast',
+									event: 'client',
+									payload: { raw },
+								});
+								if (res === 'ok') return;
+							} catch (error) {
+								logger.debug(`Realtime send attempt failed for ${type}`, error);
+							}
+							await new Promise((resolve) => setTimeout(resolve, 200));
+						}
+						logger.warn(`Realtime send never acknowledged after retries: ${type}`);
+					};
+
 					// Always request conversation state explicitly (running/full history)
-					sendWebSocketMessage(shim as unknown as WebSocket, 'get_conversation_state');
+					void reliableSend('get_conversation_state');
 
 					// Request file generation for new chats only
 					if (!opts?.disableGenerate) {
 						logger.debug('🔄 Starting code generation for new chat');
 						setIsGenerating(true);
-						sendWebSocketMessage(shim as unknown as WebSocket, 'generate_all');
+						void reliableSend('generate_all');
 					}
 				} else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
 					subscribedRef.current = false;

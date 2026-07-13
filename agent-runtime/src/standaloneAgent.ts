@@ -317,6 +317,7 @@ export class StandaloneAgent implements AgentHost {
             const requestedQuery = initArgs.query?.trim();
             if (requestedQuery) {
                 await this.initializeProject(requestedQuery, projectType);
+                this.startInitialGeneration();
             }
             return;
         }
@@ -324,6 +325,35 @@ export class StandaloneAgent implements AgentHost {
         this.behavior.migrateStateIfNeeded();
         void this.gitInit();
         void this.behavior.ensureTemplateDetails();
+    }
+
+    /**
+     * Auto-start generation for a freshly-created, query-bearing session.
+     *
+     * The sandbox is created (with the query persisted in
+     * `agent_sessions.init_args`) as part of the create-session request, so by
+     * the time the agent boots it already has everything it needs to build. It
+     * must NOT wait for the browser to deliver a `generate_all` message to
+     * begin: that trigger is unreliable on this stack. The new-chat flow
+     * navigates `/chat/new` -> `/chat/{id}`, which remounts the client onto the
+     * reconnect path (which deliberately suppresses `generate_all`), and any
+     * client send also races the agent's Realtime channel subscribe — so
+     * `generate_all` is routinely lost and generation never starts. Kicking it
+     * off here makes generation deterministic and independent of the client.
+     *
+     * Mirrors the GENERATE_ALL websocket handler
+     * (worker/agents/core/websocket.ts) and `handleUserInput()` below. The
+     * `isCodeGenerating()` guard makes a later client `generate_all` a safe
+     * no-op, so a client that does still deliver one cannot double-generate.
+     */
+    private startInitialGeneration(): void {
+        this.setState({ ...this.state, shouldBeGenerating: true });
+        if (this.behavior.isCodeGenerating()) {
+            return;
+        }
+        this.behavior.generateAllFiles().catch((error: unknown) => {
+            this.logger().error('Error auto-starting initial generation:', error);
+        });
     }
 
     /**

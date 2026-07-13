@@ -936,7 +936,6 @@ export default function Chat() {
 					websocket={websocket}
 					chatFormRef={chatFormRef}
 					limitsData={limitsData}
-					onConnectCloudflare={() => { window.location.href = `/oauth/login?return_url=${encodeURIComponent(window.location.href)}`; }}
 				/>
 				</motion.div>
 

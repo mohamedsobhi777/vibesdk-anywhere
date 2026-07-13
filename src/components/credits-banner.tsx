@@ -1,12 +1,10 @@
 import { useState, useMemo, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { type UsageSummary, type LimitConfig } from '@/hooks/use-limits';
-import { CloudflareLogo } from './icons/logos';
 import { CREDITS_BANNER_THRESHOLD } from '../../shared/constants/limits';
 
 interface CreditsBannerProps {
 	limitsData?: UsageSummary | null;
-	onConnectCloudflare?: () => void;
 	className?: string;
 	children?: ReactNode;
 	/** Border-radius (in px) of the encapsulated element — banner adds matching bottom padding so it tucks flush beneath it. */
@@ -76,8 +74,8 @@ function resolveResetDate(limit: LimitConfig): Date | null {
 }
 
 /**
- * Build the banner content for a Cloudflare-connected user whose free tier does not apply
- * (either unlimited plan or free tier exhausted). Renders the Cloudflare logo + gateway balance
+ * Build the banner content for a connected user whose free tier does not apply
+ * (either unlimited plan or free tier exhausted). Renders the gateway balance
  * when credits are known, otherwise a plain fallback string.
  */
 function buildConnectedBalanceContent(
@@ -91,7 +89,6 @@ function buildConnectedBalanceContent(
 	}
 	return (
 		<span className="inline-flex items-center gap-1">
-			<CloudflareLogo className="w-3.5 h-3.5" />
 			<span>{formatMoney(credits.credits, credits.currency)} {resetSuffix}</span>
 		</span>
 	);
@@ -111,7 +108,7 @@ function useBannerInfo(limitsData?: UsageSummary | null): { bannerInfo: BannerIn
 			if (cloudflareCredits && cloudflareCredits.credits >= CREDITS_BANNER_THRESHOLD) return null;
 			const resetDate = config.limit ? resolveResetDate(config.limit) : null;
 			return {
-				content: buildConnectedBalanceContent(cloudflareCredits, resetDate, 'Connected to AI Gateway'),
+				content: buildConnectedBalanceContent(cloudflareCredits, resetDate, 'Using your own credits'),
 				isConnected: true,
 			};
 		}
@@ -130,7 +127,7 @@ function useBannerInfo(limitsData?: UsageSummary | null): { bannerInfo: BannerIn
 		if (remaining <= 0 && isConnected) {
 			if (cloudflareCredits && cloudflareCredits.credits >= CREDITS_BANNER_THRESHOLD) return null;
 			return {
-				content: buildConnectedBalanceContent(cloudflareCredits, resetDate, 'Free credits exhausted · using your AI Gateway'),
+				content: buildConnectedBalanceContent(cloudflareCredits, resetDate, 'Free credits exhausted · using your own credits'),
 				isConnected: true,
 			};
 		}
@@ -171,7 +168,7 @@ function useBannerInfo(limitsData?: UsageSummary | null): { bannerInfo: BannerIn
 	return { bannerInfo, dismiss: () => setIsDismissed(true) };
 }
 
-export function CreditsBanner({ limitsData, onConnectCloudflare, className, children, radius = 12 }: CreditsBannerProps) {
+export function CreditsBanner({ limitsData, className, children, radius = 12 }: CreditsBannerProps) {
 	const { bannerInfo, dismiss } = useBannerInfo(limitsData);
 
 	if (children) {
@@ -180,7 +177,6 @@ export function CreditsBanner({ limitsData, onConnectCloudflare, className, chil
 				{bannerInfo && (
 					<BannerContent
 						bannerInfo={bannerInfo}
-						onConnectCloudflare={onConnectCloudflare}
 						onDismiss={dismiss}
 						style={{ paddingBottom: radius + 6, marginBottom: -radius, borderTopLeftRadius: radius, borderTopRightRadius: radius, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}
 					/>
@@ -195,7 +191,6 @@ export function CreditsBanner({ limitsData, onConnectCloudflare, className, chil
 	return (
 		<BannerContent
 			bannerInfo={bannerInfo}
-			onConnectCloudflare={onConnectCloudflare}
 			onDismiss={dismiss}
 			className={className}
 		/>
@@ -204,13 +199,11 @@ export function CreditsBanner({ limitsData, onConnectCloudflare, className, chil
 
 function BannerContent({
 	bannerInfo,
-	onConnectCloudflare,
 	onDismiss,
 	className,
 	style,
 }: {
 	bannerInfo: BannerInfo;
-	onConnectCloudflare?: () => void;
 	onDismiss: () => void;
 	className?: string;
 	style?: React.CSSProperties;
@@ -224,16 +217,6 @@ function BannerContent({
 				{bannerInfo.content}
 			</span>
 			<div className="flex items-center gap-1.5">
-				{!bannerInfo.isConnected && (
-					<button
-						type="button"
-						onClick={onConnectCloudflare}
-						className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-sm text-white bg-accent/25 hover:bg-accent transition-colors duration-200"
-					>
-						<CloudflareLogo className="w-3.5 h-3.5" color1="#fff" color2="#fff" />
-						Connect
-					</button>
-				)}
 				<button
 					type="button"
 					onClick={onDismiss}

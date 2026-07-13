@@ -13,8 +13,7 @@ import {
 	DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, ExternalLink } from 'lucide-react';
-import { CloudflareLogo } from '@/components/icons/logos';
+import { AlertCircle } from 'lucide-react';
 import { MINIMUM_CLOUDFLARE_BALANCE } from '../../shared/constants/limits';
 
 export interface LimitCheckDialogResult {
@@ -38,16 +37,7 @@ function createNoTokenDialog(onConnect: () => void, onClose: () => void): React.
 						Daily free limit exhausted
 					</DialogTitle>
 					<DialogDescription className="pt-2 text-sm">
-						You've used your free credits. Connect your Cloudflare account to continue building with your own credits.{' '}
-						<a
-							href="https://developers.cloudflare.com/ai-gateway/"
-							target="_blank"
-							rel="noopener noreferrer"
-							className="text-blue-500 hover:text-blue-600 inline-flex items-center gap-0.5"
-						>
-							Learn more
-							<ExternalLink className="h-3 w-3" />
-						</a>
+						You've used your free credits. Connect your own API key to continue building with your own credits.
 					</DialogDescription>
 				</DialogHeader>
 				<DialogFooter className="sm:justify-start gap-2">
@@ -59,8 +49,7 @@ function createNoTokenDialog(onConnect: () => void, onClose: () => void): React.
 						}}
 						className="w-full sm:w-auto bg-[#f48120] hover:bg-[#e0741a] text-white"
 					>
-						<CloudflareLogo className="w-4 h-4 mr-2" color1="#fff" color2="#fff" />
-						Connect Cloudflare
+						Connect
 					</Button>
 					<Button
 						type="button"
@@ -88,10 +77,10 @@ function createNotConfiguredDialog(onClose: () => void): React.ReactElement {
 						<AlertCircle className="h-10 w-10 text-text-tertiary" />
 					</div>
 					<DialogTitle className="text-xl">
-						Configure AI Gateway
+						Configure account
 					</DialogTitle>
 					<DialogDescription className="pt-2 text-sm">
-						Your Cloudflare account is connected but you need to select an AI Gateway to continue.
+						Your account is connected but needs additional configuration to continue.
 					</DialogDescription>
 				</DialogHeader>
 				<DialogFooter className="sm:justify-start gap-2">
@@ -103,8 +92,7 @@ function createNotConfiguredDialog(onClose: () => void): React.ReactElement {
 						}}
 						className="w-full sm:w-auto bg-[#f48120] hover:bg-[#e0741a] text-white"
 					>
-						<CloudflareLogo className="w-4 h-4 mr-2" color1="#fff" color2="#fff" />
-						Configure Gateway
+						Configure
 					</Button>
 					<Button
 						type="button"
@@ -123,7 +111,7 @@ function createNotConfiguredDialog(onClose: () => void): React.ReactElement {
 /**
  * Internal helper: Create "Insufficient Balance" dialog
  */
-function createInsufficientBalanceDialog(balance: number, accountId: string | undefined, onClose: () => void): React.ReactElement {
+function createInsufficientBalanceDialog(balance: number, onClose: () => void): React.ReactElement {
 	return (
 		<Dialog open={true} onOpenChange={onClose}>
 			<DialogContent className="sm:max-w-md">
@@ -135,33 +123,10 @@ function createInsufficientBalanceDialog(balance: number, accountId: string | un
 						Insufficient credits
 					</DialogTitle>
 					<DialogDescription className="pt-2 text-sm">
-						Your Cloudflare account has ${balance.toFixed(2)} in credits. Add more credits to continue building.{' '}
-						<a
-							href="https://developers.cloudflare.com/ai-gateway/"
-							target="_blank"
-							rel="noopener noreferrer"
-							className="text-blue-500 hover:text-blue-600 inline-flex items-center gap-0.5"
-						>
-							Learn more
-							<ExternalLink className="h-3 w-3" />
-						</a>
+						Your account has ${balance.toFixed(2)} in credits. Add more credits to continue building.
 					</DialogDescription>
 				</DialogHeader>
 				<DialogFooter className="sm:justify-start gap-2">
-					<Button
-						type="button"
-						onClick={() => {
-							onClose();
-							const url = accountId 
-								? `https://dash.cloudflare.com/${accountId}/ai/ai-gateway/credits`
-								: 'https://dash.cloudflare.com';
-							window.open(url, '_blank');
-						}}
-						className="w-full sm:w-auto bg-[#f48120] hover:bg-[#e0741a] text-white"
-					>
-						<ExternalLink className="w-4 h-4 mr-2" />
-						Add Credits
-					</Button>
 					<Button
 						type="button"
 						variant="outline"
@@ -224,7 +189,6 @@ export function checkCanSendPrompt(
 				canProceed: false,
 				dialogComponent: createInsufficientBalanceDialog(
 					credits,
-					cloudflareCredits?.accountId,
 					onClose
 				),
 			};
@@ -278,7 +242,6 @@ export function getBackendLimitDialog(
 				canProceed: false,
 				dialogComponent: createInsufficientBalanceDialog(
 					credits,
-					cloudflareCredits?.accountId,
 					onClose
 				),
 			};

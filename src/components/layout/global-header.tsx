@@ -5,11 +5,11 @@ import { ThemeToggle } from '../theme-toggle';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/auth-context';
 import { ChevronRight, AlertCircle } from 'lucide-react';
-import { CloudflareLogo } from '../icons/logos';
+import { SuperVibeLogo } from '../icons/logos';
 import { usePlatformStatus } from '@/hooks/use-platform-status';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useLocation } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import clsx from 'clsx';
 import { UsageLimitsBadge } from '../usage-limits-badge';
 
@@ -42,26 +42,20 @@ export function GlobalHeader() {
 					{/* Main content */}
 					<div className="relative z-10 grid grid-cols-[auto_1fr_auto] items-center gap-4 px-5 py-2">
 						{/* Left section */}
-						{user ? (
-							<motion.div
-								whileTap={{ scale: 0.95 }}
-								transition={{
-									type: 'spring',
-									stiffness: 400,
-									damping: 17,
-								}}
-								className='flex items-center'
-							>
-								<SidebarTrigger className="h-8 w-8 text-text-primary rounded-md hover:bg-orange-50/40 transition-colors duration-200" />
-								<CloudflareLogo
-									className="flex-shrink-0 mx-auto transition-all duration-300"
+						<div className='flex items-center'>
+							{user && (
+								<SidebarTrigger className="h-8 w-8 mr-2 text-text-primary rounded-md hover:bg-accent/10 transition-colors duration-200" />
+							)}
+							<Link to="/" aria-label="Home" className="flex items-center">
+								<SuperVibeLogo
+									className="flex-shrink-0 transition-all duration-300"
 									style={{
 										width: '28px',
 										height: '28px',
-										marginLeft: '8px',
 									}}
 								/>
-								{hasMaintenanceMessage && (
+							</Link>
+							{hasMaintenanceMessage && (
 									<button
 										type="button"
 										onClick={hasChangeLogs ? () => setIsChangelogOpen(true) : undefined}
@@ -74,10 +68,7 @@ export function GlobalHeader() {
 										<ChevronRight className="ml-1 h-4 w-4 text-accent" />
 									</button>
 								)}
-							</motion.div>
-						) : (
-							<div></div>
-						)}
+						</div>
 
 
 

@@ -48,7 +48,6 @@ export interface PromptBoxProps {
 
 	// CreditsBanner
 	limitsData?: UsageSummary | null;
-	onConnectCloudflare?: () => void;
 
 	// Layout
 	variant?: 'compact' | 'expanded';
@@ -85,7 +84,6 @@ export function PromptBox({
 	disabled = false,
 	submitDisabled = false,
 	limitsData,
-	onConnectCloudflare,
 	variant = 'compact',
 	leftActions,
 	rightActions,
@@ -141,8 +139,8 @@ export function PromptBox({
 	if (isCompact) {
 		return (
 			<div className={className} {...dragHandlers}>
-				<CreditsBanner limitsData={limitsData} onConnectCloudflare={onConnectCloudflare}>
-					<div className="rounded-xl bg-bg-2 border border-[#f48120]/30 focus-within:border-[#f48120]/70 transition-all duration-200">
+				<CreditsBanner limitsData={limitsData}>
+					<div className="rounded-xl bg-bg-2 border border-accent/30 focus-within:border-accent/60 focus-within:ring-2 focus-within:ring-accent/10 transition-all duration-200">
 						<form ref={formRef} onSubmit={handleSubmit}>
 							<div className="relative">
 								{dragOverlay}
@@ -181,7 +179,7 @@ export function PromptBox({
 									<button
 										type="submit"
 										disabled={!value.trim() || disabled || submitDisabled}
-										className="p-1.5 rounded-md bg-accent/90 hover:bg-accent/80 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-transparent text-white disabled:text-text-primary transition-colors"
+										className="p-1.5 rounded-md bg-accent/90 hover:bg-accent/80 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-transparent text-white disabled:text-text-primary disabled:active:scale-100 transition-all"
 									>
 										{submitIcon ?? <ArrowRight className="size-4" />}
 									</button>
@@ -198,11 +196,10 @@ export function PromptBox({
 	return (
 		<CreditsBanner
 			limitsData={limitsData}
-			onConnectCloudflare={onConnectCloudflare}
 			className={clsx('w-full z-10', className)}
 			radius={borderRadius}
 		>
-			<div className="w-full rounded-[18px] bg-bg-4 dark:bg-bg-2 border border-[#f48120]/30 focus-within:border-[#f48120]/70 transition-all duration-200">
+			<div className="w-full rounded-[18px] bg-bg-4 dark:bg-bg-2 border border-accent/30 shadow-textarea focus-within:border-accent/60 focus-within:ring-4 focus-within:ring-accent/10 transition-all duration-200">
 				<form
 					ref={formRef}
 					onSubmit={handleSubmit}
@@ -258,7 +255,7 @@ export function PromptBox({
 							<button
 								type="submit"
 								disabled={!value.trim() || disabled || submitDisabled}
-								className="bg-accent text-white p-1 rounded-md *:size-5 transition-all duration-200 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+								className="bg-accent text-white p-2 rounded-lg *:size-5 transition-all duration-200 hover:bg-accent/90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
 							>
 								{submitIcon ?? <ArrowRight />}
 							</button>

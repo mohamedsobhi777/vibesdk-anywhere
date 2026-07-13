@@ -1,10 +1,9 @@
 /**
- * Combined Cloudflare Connect Button with Usage Badge
- * Shows Cloudflare connect button with attached usage indicator
+ * Combined Connect Button with Usage Badge
+ * Shows a connect button with attached usage indicator
  */
 
 import { useLimitsContext } from '@/contexts/limits-context';
-import { CloudflareLogo } from './icons/logos';
 import { Loader2 } from 'lucide-react';
 
 interface UsageLimitsBadgeProps {
@@ -133,11 +132,10 @@ export function UsageLimitsBadge({ onConnect }: UsageLimitsBadgeProps) {
 
 				{/* Connect button / Credits display - on the RIGHT */}
 				<div className="flex items-center gap-1 px-2 py-1 text-text-primary">
-					<CloudflareLogo className="w-4 h-4" />
 					{loading ? (
 						<span className="hidden sm:inline text-muted-foreground">Loading...</span>
 					) : needsConfiguration ? (
-						<span className="hidden sm:inline font-medium text-amber-500">Configure AI Gateway</span>
+						<span className="hidden sm:inline font-medium text-amber-500">Configure account</span>
 					) : showCredits ? (
 						<span className="hidden sm:inline font-medium">{creditsText}</span>
 					) : (

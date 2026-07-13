@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, useEffect, useMemo } from 'react';
+import { useRef, useState, useEffect, useMemo } from 'react';
 import { ArrowRight, Info } from 'react-feather';
 import { Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router';
@@ -29,10 +29,6 @@ export default function Home() {
 	const { isLoadingCapabilities, capabilities, getEnabledFeatures } = useFeature();
 	const { data: limitsData, loading: usageLimitsLoading } = useLimitsContext();
 	const [showLimitDialog, setShowLimitDialog] = useState<React.ReactElement | null>(null);
-
-	const handleConnectCloudflare = useCallback(() => {
-		window.location.href = `/oauth/login?return_url=${encodeURIComponent(window.location.href)}`;
-	}, []);
 
 	const modeOptions = useMemo<ProjectModeOption[]>(() => {
 		if (isLoadingCapabilities || !capabilities) return [];
@@ -76,7 +72,7 @@ export default function Home() {
 
 	const placeholderPhrases = useMemo(() => [
 		"todo list app",
-		"F1 fantasy game",
+		"Formula 1 fantasy game",
 		"personal finance tracker"
 	], []);
 
@@ -185,9 +181,12 @@ export default function Home() {
 							"px-6 p-8 flex flex-col items-center z-10",
 							discoverReady ? "mt-48" : "mt-[20vh] sm:mt-[24vh] md:mt-[28vh]"
 						)}>
-						<h1 className="text-shadow-sm text-shadow-red-200 dark:text-shadow-red-900 text-accent font-medium leading-[1.1] tracking-tight text-5xl w-full mb-4 bg-clip-text bg-gradient-to-r from-text-primary to-text-primary/90">
-							What should we build today?
+						<h1 className="w-full text-4xl sm:text-5xl font-semibold leading-[1.1] tracking-tight text-text-primary mb-3">
+							What should we <span className="text-accent">build</span> today?
 						</h1>
+						<p className="w-full text-base text-text-tertiary leading-relaxed mb-6">
+							Describe your idea. The agent plans, codes, and deploys a working app you can iterate on.
+						</p>
 						<PromptBox
 							value={query}
 							onChange={setQuery}
@@ -203,7 +202,6 @@ export default function Home() {
 							dragHandlers={dragHandlers}
 							submitDisabled={user ? usageLimitsLoading : false}
 							limitsData={user ? limitsData : undefined}
-							onConnectCloudflare={handleConnectCloudflare}
 							variant="expanded"
 							submitIcon={user && usageLimitsLoading ? <Loader2 className="animate-spin" /> : <ArrowRight />}
 							leftActions={
@@ -227,6 +225,18 @@ export default function Home() {
 								) : undefined
 							}
 						/>
+						<div className="mt-4 flex w-full flex-wrap items-center gap-2">
+							{placeholderPhrases.map((phrase) => (
+								<button
+									key={phrase}
+									type="button"
+									onClick={() => setQuery(`Create a ${phrase}`)}
+									className="rounded-full border border-border-primary bg-bg-4/70 dark:bg-bg-2/70 px-3.5 py-1.5 text-xs text-text-tertiary transition-all duration-200 hover:border-accent/40 hover:text-text-primary active:scale-[0.98]"
+								>
+									{phrase}
+								</button>
+							))}
+						</div>
 					</motion.div>
 
 				</div>
@@ -261,8 +271,19 @@ export default function Home() {
 							className={clsx('max-w-6xl mx-auto px-4 z-10', images.length > 0 ? 'mt-10' : 'mt-16 mb-8')}
 						>
 							<div className='flex flex-col items-start'>
-								<h2 className="text-2xl font-medium text-text-secondary/80">Discover Apps built by the community</h2>
-								<div ref={discoverLinkRef} className="text-md font-light mb-4 text-text-tertiary hover:underline underline-offset-4 select-text cursor-pointer" onClick={() => navigate('/discover')} >View All</div>
+								<div className="w-full flex items-end justify-between gap-4 mb-5">
+									<h2 className="text-2xl font-semibold tracking-tight text-text-primary">Discover apps built by the community</h2>
+									<div ref={discoverLinkRef}>
+										<button
+											type="button"
+											onClick={() => navigate('/discover')}
+											className="group flex items-center gap-1 whitespace-nowrap text-sm text-text-tertiary transition-colors hover:text-accent"
+										>
+											View all
+											<ArrowRight className="size-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
+										</button>
+									</div>
+								</div>
 								<motion.div
 									layout
 									transition={{ duration: 0.4 }}

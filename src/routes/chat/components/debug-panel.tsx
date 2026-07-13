@@ -504,8 +504,9 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
       const subject = `Debug Dump - ${chatSessionId || 'Unknown Session'}`;
       const body = `Debug dump generated at ${new Date().toISOString()}\n\nDump data attached as JSON.`;
       
-      // Create mailto link with dump as attachment workaround
-      const mailtoLink = `mailto:ashishsingh@cloudflare.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body + '\n\n' + JSON.stringify(dump, null, 2))}`;
+      // Create mailto link with dump as attachment workaround. No fixed
+      // recipient — the user picks who to send the debug dump to.
+      const mailtoLink = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body + '\n\n' + JSON.stringify(dump, null, 2))}`;
       window.open(mailtoLink);
     } finally {
       setIsGeneratingDump(false);

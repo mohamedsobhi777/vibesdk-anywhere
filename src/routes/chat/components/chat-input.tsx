@@ -42,7 +42,6 @@ interface ChatInputProps {
 
 	// Usage limits
 	limitsData?: UsageSummary | null;
-	onConnectCloudflare?: () => void;
 }
 
 export function ChatInput({
@@ -63,7 +62,6 @@ export function ChatInput({
 	websocket,
 	chatFormRef,
 	limitsData,
-	onConnectCloudflare,
 }: ChatInputProps) {
 	const handleStopGeneration = () => {
 		if (websocket) {
@@ -109,7 +107,6 @@ export function ChatInput({
 			dragHandlers={chatDragHandlers}
 			disabled={isChatDisabled}
 			limitsData={limitsData}
-			onConnectCloudflare={onConnectCloudflare}
 			variant="compact"
 			rightActions={stopButton}
 			maxWords={4000}

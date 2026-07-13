@@ -19,14 +19,12 @@ import {
 } from 'lucide-react';
 import { useLimitsContext } from '@/contexts/limits-context';
 import { cn } from '@/lib/utils';
-import CloudflareLogo from '@/assets/provider-logos/cloudflare.svg?react';
 
 interface UsageLimitsCardProps {
 	className?: string;
-	onConnectToken?: () => void;
 }
 
-export function UsageLimitsCard({ className, onConnectToken }: UsageLimitsCardProps) {
+export function UsageLimitsCard({ className }: UsageLimitsCardProps) {
 	const { data, loading, error, refetch } = useLimitsContext();
 
 	if (loading) {
@@ -168,9 +166,9 @@ export function UsageLimitsCard({ className, onConnectToken }: UsageLimitsCardPr
 					</Alert>
 				) : (
 					<>
-						{/* Main Content: Usage Stats (Left) + Connect Button (Right) */}
+						{/* Main Content: Usage Stats */}
 						<div className="flex flex-col lg:flex-row gap-6 items-start">
-							{/* Left: Usage Stats */}
+							{/* Usage Stats */}
 							<div className="flex-1 space-y-4 w-full">
 								{/* Usage Progress */}
 								<div className="space-y-3">
@@ -218,9 +216,9 @@ export function UsageLimitsCard({ className, onConnectToken }: UsageLimitsCardPr
 										<AlertDescription>
 											<p className="font-medium mb-1">Limit Exceeded</p>
 											<p className="text-sm">
-												{hasUserToken 
-													? "Using your connected Cloudflare AI Gateway token."
-													: "Connect your Cloudflare AI Gateway token to continue."
+												{hasUserToken
+													? "Using your own connected API key."
+													: "Connect your own API key to continue."
 												}
 											</p>
 										</AlertDescription>
@@ -240,30 +238,6 @@ export function UsageLimitsCard({ className, onConnectToken }: UsageLimitsCardPr
 								)}
 							</div>
 
-							{/* Right: Cloudflare Connect Button - ALWAYS VISIBLE */}
-							<div className="flex-shrink-0 w-full lg:w-auto">
-								<div className="space-y-3">
-									<Button 
-										onClick={onConnectToken}
-										className="w-full lg:w-auto gap-2 bg-gradient-to-r from-[#f48120] to-[#faae42] hover:from-[#f48120]/90 hover:to-[#faae42]/90"
-										size="lg"
-									>
-										<CloudflareLogo className="h-5 w-5" />
-										{hasUserToken ? 'Manage Connection' : 'Connect Cloudflare'}
-									</Button>
-									
-									{hasUserToken ? (
-										<div className="flex items-center justify-center gap-2 text-xs text-green-600 dark:text-green-400">
-											<CheckCircle2 className="h-3 w-3" />
-											<span>Connected</span>
-										</div>
-									) : (
-										<p className="text-xs text-center text-text-tertiary max-w-[200px]">
-											Continue using with your own token
-										</p>
-									)}
-								</div>
-							</div>
 						</div>
 					</>
 				)}

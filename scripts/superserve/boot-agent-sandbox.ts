@@ -146,8 +146,8 @@ async function main(): Promise<void> {
 		envVars,
 		network: { allowOut: buildEgressAllowlist(bootEnv.supabaseUrl) },
 		metadata: {
-			vibesdk_kind: 'agent',
-			vibesdk_session: bootEnv.sessionId,
+			supervibe_kind: 'agent',
+			supervibe_session: bootEnv.sessionId,
 		},
 	});
 
@@ -157,7 +157,7 @@ async function main(): Promise<void> {
 	// group: boxd SIGKILLs the exec's process group on timeout, and the
 	// agent must outlive this short-lived start command.
 	const startResult = await sandbox.commands.run(
-		'cd /opt/vibesdk && setsid nohup bun agent-runtime/src/main.ts > /workspace/agent.log 2>&1 < /dev/null & echo $!',
+		'cd /opt/supervibe && setsid nohup bun agent-runtime/src/main.ts > /workspace/agent.log 2>&1 < /dev/null & echo $!',
 		{ timeoutMs: START_TIMEOUT_MS },
 	);
 	console.log(`Agent start command exited ${startResult.exitCode}; pid: ${startResult.stdout.trim()}`);

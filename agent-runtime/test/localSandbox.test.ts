@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { LocalSandboxService } from '../src/localSandbox';
 
-const workspaceDir = mkdtempSync(join(tmpdir(), 'vibesdk-local-sandbox-'));
+const workspaceDir = mkdtempSync(join(tmpdir(), 'supervibe-local-sandbox-'));
 afterAll(() => rmSync(workspaceDir, { recursive: true, force: true }));
 
 describe('LocalSandboxService', () => {

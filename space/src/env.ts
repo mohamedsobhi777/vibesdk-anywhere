@@ -8,12 +8,12 @@ export interface Env {
   // Durable Object bindings
   SPACE_DO: DurableObjectNamespace
   /**
-   * VibeSDK agent DO. Optional — the host worker may or may not provide
+   * SuperVibe agent DO. Optional — the host worker may or may not provide
    * this — but when present, the `get_browser_console_logs` tool routes
    * RPC calls through it to reuse the agent's capture pipeline.
    *
    * Typed as a loose namespace so TS doesn't complain about the
-   * concrete `CodeGeneratorAgent` class shape from VibeSDK (which
+   * concrete `CodeGeneratorAgent` class shape from SuperVibe (which
    * lives outside this workspace). The tool casts at the call site
    * with the expected method signature.
    */

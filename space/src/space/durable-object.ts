@@ -201,7 +201,7 @@ export class SpaceDO extends DurableObject<Env> {
       .map((f: FileInfo) => ({ path: f.path, mtime: f.updatedAt }))
   }
 
-  // ── Workspace RPC methods consumed by VibeSDK's Think workspace tools ──
+  // ── Workspace RPC methods consumed by SuperVibe's Think workspace tools ──
   // These mirror the `@cloudflare/shell` Workspace surface 1:1 so the host's
   // `createSpaceWorkspaceOps()` adapter can back `@cloudflare/think`'s
   // read/write/edit/list/find/grep/delete tools with this SpaceDO.
@@ -259,7 +259,7 @@ export class SpaceDO extends DurableObject<Env> {
     await this.git.add({ filepath: "." })
     const result = await this.git.commit({
       message,
-      author: author ?? { name: "Agent", email: "agent@vibesdk.local" },
+      author: author ?? { name: "Agent", email: "agent@supervibe.local" },
     })
     return { sha: result.oid, message: result.message }
   }

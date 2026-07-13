@@ -97,7 +97,7 @@ run in CI, verified by type-checking only):
 
 ```bash
 # 1. Build (or rebuild) the SuperServe template the agent process runs in.
-#    Clones the vibesdk repo server-side at a pinned ref and pre-installs
+#    Clones the supervibe repo server-side at a pinned ref and pre-installs
 #    Node 22 + bun + `bun install`, so boot only has to start the process.
 SUPERSERVE_API_KEY=ss_live_... bun run scripts/superserve/build-agent-template.ts
 

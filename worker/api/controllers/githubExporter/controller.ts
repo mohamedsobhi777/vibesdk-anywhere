@@ -225,7 +225,7 @@ export class GitHubExporterController extends BaseController {
                 token,
                 repositoryUrl,
                 username,
-                email: 'vibesdk-bot@cloudflare.com',
+                email: 'supervibe-bot@cloudflare.com',
             });
 
             if (!pushResult?.success) {
@@ -341,7 +341,7 @@ export class GitHubExporterController extends BaseController {
                     description: exportData.description,
                     isPrivate: exportData.isPrivate || false,
                     token: tokenResult.accessToken,
-                    username: 'vibesdk-bot'
+                    username: 'supervibe-bot'
                 });
 
                 if (!result.success) {

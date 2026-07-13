@@ -55,7 +55,7 @@ export class GitVersionControl {
     }
 
     constructor(sql: SqlExecutor, options?: GitVersionControlOptions) {
-        this.author = options?.author || { name: 'Vibesdk', email: 'vibesdk-bot@cloudflare.com' };
+        this.author = options?.author || { name: 'SuperVibe', email: 'supervibe-bot@cloudflare.com' };
 
         if (options?.fs) {
             this.gitFs = options.fs;

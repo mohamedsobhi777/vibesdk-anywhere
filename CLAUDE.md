@@ -9,7 +9,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 - Use clear technical language
 
 ## Project Overview
-vibesdk is an AI-powered full-stack application generation platform built on Cloudflare infrastructure.
+supervibe is an AI-powered full-stack application generation platform built on Cloudflare infrastructure.
 
 **Tech Stack:**
 - Frontend: React 19, TypeScript, Vite, TailwindCSS, React Router v7

@@ -2,7 +2,7 @@
 
 A reusable Cloudflare Durable Object class — `SpaceDO` — that provides a
 git-backed, isolated workspace with preview and deploy support on the Workers
-runtime. It is the file/preview/deploy backend used by VibeSDK's `think`
+runtime. It is the file/preview/deploy backend used by SuperVibe's `think`
 agent (the agentic loop itself lives in the `@cloudflare/think` `ThinkAgent`).
 
 ## Install

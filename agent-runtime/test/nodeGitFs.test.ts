@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { GitVersionControl } from 'worker/agents/git';
 import { createNodeGitFs, resolveWithin } from '../src/nodeGitFs';
 
-const tmpBase = mkdtempSync(join(tmpdir(), 'vibesdk-node-git-fs-'));
+const tmpBase = mkdtempSync(join(tmpdir(), 'supervibe-node-git-fs-'));
 afterAll(() => rmSync(tmpBase, { recursive: true, force: true }));
 
 describe('createNodeGitFs', () => {
@@ -33,7 +33,7 @@ describe('createNodeGitFs', () => {
 
     describe('symlink target guard', () => {
         it('rejects a symlink whose relative target escapes baseDir', () => {
-            const symlinkBase = mkdtempSync(join(tmpdir(), 'vibesdk-node-git-fs-symlink-'));
+            const symlinkBase = mkdtempSync(join(tmpdir(), 'supervibe-node-git-fs-symlink-'));
             const fs = createNodeGitFs(symlinkBase);
             // Link lives at /link inside symlinkBase; a target of
             // '../../../etc/passwd' resolves (relative to the link's own
@@ -42,13 +42,13 @@ describe('createNodeGitFs', () => {
         });
 
         it('rejects a symlink whose absolute target points outside baseDir', () => {
-            const symlinkBase = mkdtempSync(join(tmpdir(), 'vibesdk-node-git-fs-symlink-'));
+            const symlinkBase = mkdtempSync(join(tmpdir(), 'supervibe-node-git-fs-symlink-'));
             const fs = createNodeGitFs(symlinkBase);
             expect(fs.symlink('/etc/passwd', '/link')).rejects.toThrow(/Symlink target rejected/);
         });
 
         it('allows a symlink whose relative target stays within baseDir', async () => {
-            const symlinkBase = mkdtempSync(join(tmpdir(), 'vibesdk-node-git-fs-symlink-'));
+            const symlinkBase = mkdtempSync(join(tmpdir(), 'supervibe-node-git-fs-symlink-'));
             writeFileSync(join(symlinkBase, 'real.txt'), 'hello');
             const fs = createNodeGitFs(symlinkBase);
 
@@ -59,7 +59,7 @@ describe('createNodeGitFs', () => {
         });
 
         it('allows a symlink target nested in a subdirectory whose ".." segments stay within baseDir', async () => {
-            const symlinkBase = mkdtempSync(join(tmpdir(), 'vibesdk-node-git-fs-symlink-'));
+            const symlinkBase = mkdtempSync(join(tmpdir(), 'supervibe-node-git-fs-symlink-'));
             mkdirSync(join(symlinkBase, 'sub'), { recursive: true });
             writeFileSync(join(symlinkBase, 'real.txt'), 'nested-ok');
             const fs = createNodeGitFs(symlinkBase);

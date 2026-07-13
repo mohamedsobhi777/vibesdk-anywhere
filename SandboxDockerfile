@@ -14,8 +14,8 @@ RUN apt-get update && \
         chmod +x cloudflared && \
         mv cloudflared /usr/local/bin/ && \
         rm -rf /var/lib/apt/lists/* && \    
-        git config --global user.email "vibesdk-bot@cloudflare.com" && \
-        git config --global user.name "Cloudflare Vibesdk bot"
+        git config --global user.email "supervibe-bot@cloudflare.com" && \
+        git config --global user.name "Cloudflare SuperVibe bot"
 
 # Create directory for error monitoring system
 RUN mkdir -p /workspace/container /workspace/data

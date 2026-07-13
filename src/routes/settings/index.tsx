@@ -608,7 +608,7 @@ export default function SettingsPage() {
 						<CardContent className="space-y-4 mt-4 px-6">
 							<div className="flex items-start justify-between gap-4">
 								<div className="space-y-1">
-									<h4 className="font-medium text-sm">VibeSDK API Keys</h4>
+									<h4 className="font-medium text-sm">SuperVibe API Keys</h4>
 									<p className="text-sm text-text-secondary">
 										Use these keys to authenticate external SDK clients. The full key is shown only once when created.
 									</p>
@@ -658,7 +658,7 @@ export default function SettingsPage() {
 
 												<div className="rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 p-3">
 													<p className="text-sm text-amber-800 dark:text-amber-200">
-														<strong>Important:</strong> Treat this like a password. Anyone with this key can act as your VibeSDK account.
+														<strong>Important:</strong> Treat this like a password. Anyone with this key can act as your SuperVibe account.
 													</p>
 												</div>
 											</div>
@@ -701,7 +701,7 @@ export default function SettingsPage() {
 												<div className="rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3">
 													<p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-2">SDK usage</p>
 													<code className="text-xs text-slate-600 dark:text-slate-400 block font-mono">
-														VIBESDK_API_KEY={createdKey.keyPreview}
+														SUPERVIBE_API_KEY={createdKey.keyPreview}
 													</code>
 												</div>
 											</div>
@@ -750,7 +750,7 @@ export default function SettingsPage() {
 										<div className="space-y-1">
 											<p className="font-medium">No API keys yet</p>
 											<p className="text-sm text-text-tertiary">
-												Create an API key to use the VibeSDK SDK from your own apps.
+												Create an API key to use the SuperVibe SDK from your own apps.
 											</p>
 										</div>
 									</div>

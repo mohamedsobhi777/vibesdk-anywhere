@@ -1,8 +1,8 @@
-# LLM Developer Guide for vibesdk
+# LLM Developer Guide for supervibe
 
 > **📋 Meta-Instruction for AI Assistants:**
 > 
-> This document contains comprehensive architectural knowledge for **vibesdk** - an AI-powered full-stack app generation platform built on Cloudflare Workers with React.
+> This document contains comprehensive architectural knowledge for **supervibe** - an AI-powered full-stack app generation platform built on Cloudflare Workers with React.
 >
 > **Your Responsibilities:**
 > 1. **Read this entire document** before making ANY changes
@@ -225,7 +225,7 @@ const delay = Math.min(Math.pow(2, attempt) * 1000, 30000);
 ### **Complete Directory Structure**
 
 ```
-📦 vibesdk/
+📦 supervibe/
 │
 ├── 📁 src/                                    # Frontend React application
 │   ├── api-types.ts                          # ALL shared types (single source of truth)
@@ -755,7 +755,7 @@ These tools are used internally by the sandbox service and for local debugging. 
 
 **Location:** `/worker/agents/git/`
 
-Vibesdk uses **isomorphic-git** to manage version control entirely in the browser/Worker environment - no git binary required.
+SuperVibe uses **isomorphic-git** to manage version control entirely in the browser/Worker environment - no git binary required.
 
 **Key features:**
 - Git operations in SQLite (no filesystem needed)
@@ -810,7 +810,7 @@ Vibesdk uses **isomorphic-git** to manage version control entirely in the browse
 2. Calls `GitService.commitFiles(files, message)`
 3. Git service stages all files
 4. Creates commit with metadata:
-   - Author: "vibesdk AI Agent"
+   - Author: "supervibe AI Agent"
    - Committer: same
    - Message: "Phase X: Feature Y" or "Fix: Bug Z"
    - Timestamp: current time
@@ -875,7 +875,7 @@ Vibesdk uses **isomorphic-git** to manage version control entirely in the browse
 
 **Usage:**
 ```bash
-git clone https://vibesdk.com/git/{agentId}
+git clone https://supervibe.com/git/{agentId}
 ```
 
 User gets complete repository with:
@@ -3589,7 +3589,7 @@ try {
 
 ## Overview
 
-**SimpleCodeGeneratorAgent** is the brain of vibesdk - a Durable Object that orchestrates entire app generation lifecycle.
+**SimpleCodeGeneratorAgent** is the brain of supervibe - a Durable Object that orchestrates entire app generation lifecycle.
 
 **Key responsibilities:**
 - Blueprint generation from user prompts

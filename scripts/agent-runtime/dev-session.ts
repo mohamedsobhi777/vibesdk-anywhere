@@ -249,7 +249,7 @@ export async function runSmokeSession(options: RunSmokeSessionOptions): Promise<
                 SUPABASE_ANON_KEY: keys.anonKey,
                 SUPABASE_SESSION_JWT: sessionJwt,
                 TEMPLATES_BASE_URL: PLACEHOLDER_TEMPLATES_BASE_URL,
-                WORKSPACE_DIR: `/tmp/vibesdk-smoke-${sessionId}`,
+                WORKSPACE_DIR: `/tmp/supervibe-smoke-${sessionId}`,
             },
             stdout: 'inherit',
             stderr: 'inherit',

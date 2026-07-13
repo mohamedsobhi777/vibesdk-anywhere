@@ -1,5 +1,5 @@
 {
-	"name": "vibesdk-test",
+	"name": "supervibe-test",
 	"compatibility_date": "2024-12-12",
 	"main": "test/worker-entry.ts",
 	"compatibility_flags": ["nodejs_compat"],

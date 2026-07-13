@@ -34,8 +34,8 @@ import { Template, type BuildLogEvent } from '@superserve/sdk';
 const TEMPLATE_NAME = process.env.SUPERSERVE_AGENT_TEMPLATE ?? 'bun-agent-runtime';
 // The re-platform's `agent-runtime/` code lives in this fork; the original
 // `cloudflare/vibesdk` has the old Durable-Object code. Override via env.
-const AGENT_REPO = process.env.AGENT_TEMPLATE_REPO ?? process.env.VIBESDK_REPO ?? 'https://github.com/mohamedsobhi777/vibesdk-anywhere';
-const AGENT_REF = process.env.AGENT_TEMPLATE_REF ?? process.env.VIBESDK_REF ?? 'main';
+const AGENT_REPO = process.env.AGENT_TEMPLATE_REPO ?? process.env.SUPERVIBE_REPO ?? 'https://github.com/mohamedsobhi777/supervibe';
+const AGENT_REF = process.env.AGENT_TEMPLATE_REF ?? process.env.SUPERVIBE_REF ?? 'main';
 // Optional read-only token to clone a PRIVATE repo at build time. Injected
 // only into the clone URL and scrubbed together with `.git` before the image
 // is finalized, so it never persists in the template image (it may still
@@ -90,7 +90,7 @@ async function main(apiKey: string): Promise<void> {
 			{
 				run: 'apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y curl ca-certificates git unzip procps',
 			},
-			// Node 22 (some tooling in the vibesdk tree expects node on PATH).
+			// Node 22 (some tooling in the supervibe tree expects node on PATH).
 			{ run: 'curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs' },
 			// Bun (primary runtime for the agent process and generated apps).
 			{
@@ -100,7 +100,7 @@ async function main(apiKey: string): Promise<void> {
 			// only has to start the agent process, not install dependencies.
 			// `rm -rf .git` scrubs any clone token before the image is finalized.
 			{
-				run: `git clone --depth 1 --branch ${AGENT_REF} ${cloneUrl} /opt/vibesdk && cd /opt/vibesdk && bun install && rm -rf /opt/vibesdk/.git`,
+				run: `git clone --depth 1 --branch ${AGENT_REF} ${cloneUrl} /opt/supervibe && cd /opt/supervibe && bun install && rm -rf /opt/supervibe/.git`,
 			},
 			{ run: 'mkdir -p /workspace' },
 			{ env: { key: 'VITE_LOGGER_TYPE', value: 'json' } },

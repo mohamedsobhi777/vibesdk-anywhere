@@ -65,7 +65,7 @@ describe('standalone runtime D1 seam (C1/C2 regression)', () => {
         const agent = await StandaloneAgent.boot({
             sessionId: 's-d1-seam-1',
             agentId: 'a-d1-seam-1',
-            workspaceDir: '/tmp/vibesdk-test-d1-seam-1',
+            workspaceDir: '/tmp/supervibe-test-d1-seam-1',
             env,
             transport: f.transport as never,
             stateStore: f.stateStore as never,

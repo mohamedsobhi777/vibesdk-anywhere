@@ -4,7 +4,7 @@
  */
  {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "vibesdk-production",
+	"name": "supervibe-production",
 	"main": "worker/index.ts",
 	// Facets (durable-object-facets) require a recent compat date — bumped
 	// from 2025-08-10 to enable `ctx.facets.get()` for space-generated
@@ -73,7 +73,7 @@
     "dispatch_namespaces": [
         {
             "binding": "DISPATCHER",
-            "namespace": "vibesdk-default-namespace",
+            "namespace": "supervibe-default-namespace",
             "remote": true
         }
     ],
@@ -81,7 +81,7 @@
 		{
 			"class_name": "UserAppSandboxService",
 			"image": "./SandboxDockerfile",
-            // "image": "registry.cloudflare.com/vibesdk-production-userappsandboxservice:cfe197fc",
+            // "image": "registry.cloudflare.com/supervibe-production-userappsandboxservice:cfe197fc",
             // Altering max_instances value will have no effect. Please use the MAX_SANDBOX_INSTANCES var instead.
 			"max_instances": 1400,
             // ATTENTION: Altering instance_type value will have no effect. Please use the SANDBOX_INSTANCE_TYPE var instead.
@@ -99,7 +99,7 @@
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "vibesdk-db",
+			"database_name": "supervibe-db",
 			"database_id": "c4721a2b-b96a-428a-8b2a-b3d255b307e9",
 			"migrations_dir": "migrations"
 		}
@@ -140,7 +140,7 @@
     "r2_buckets": [
       {
         "binding": "TEMPLATES_BUCKET",
-        "bucket_name": "vibesdk-templates"
+        "bucket_name": "supervibe-templates"
       }
     ],
     "kv_namespaces": [
@@ -199,9 +199,9 @@
 	"vars": {
         "TEMPLATES_REPOSITORY": "https://github.com/cloudflare/vibesdk-templates",
         "ALLOWED_EMAIL": "",
-        "DISPATCH_NAMESPACE": "vibesdk-default-namespace",
+        "DISPATCH_NAMESPACE": "supervibe-default-namespace",
         "ENABLE_READ_REPLICAS": "true",
-        "CLOUDFLARE_AI_GATEWAY": "vibesdk-gateway",
+        "CLOUDFLARE_AI_GATEWAY": "supervibe-gateway",
         "PLATFORM_CAPABILITIES": {
             "features": {
                 "app": {
@@ -222,7 +222,7 @@
         "DEV_BROWSER_SIDECAR_URL": "http://127.0.0.1:9223",
         "DEV_BROWSER_PREVIEW_ORIGIN": "http://localhost:5173",
         "SUPERSERVE_API_KEY": "",
-        "SUPERSERVE_TEMPLATE": "vibesdk-sandbox",
+        "SUPERSERVE_TEMPLATE": "supervibe-sandbox",
         "SUPERSERVE_SANDBOX_HOST": "sandbox.superserve.ai",
         "SUPERSERVE_BASE_URL": "",
         "SUPERSERVE_EGRESS_ALLOW": "",

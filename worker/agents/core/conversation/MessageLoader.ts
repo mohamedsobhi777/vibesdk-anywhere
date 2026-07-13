@@ -20,7 +20,7 @@ export abstract class ConversationMessageLoader {
 	abstract clear(): Promise<void>;
 }
 
-// ── Local (VibeSDK SQLite) implementation ───────────────────────────
+// ── Local (SuperVibe SQLite) implementation ───────────────────────────
 
 /**
  * Minimal surface the local loader needs from the host agent. Avoids a
@@ -60,7 +60,7 @@ interface ThinkAgentLike {
 
 /**
  * Reads chat history from `ThinkAgent.getMessages()` and expands each AI-SDK
- * `UIMessage` into one or more VibeSDK `ConversationMessage` entries, matching
+ * `UIMessage` into one or more SuperVibe `ConversationMessage` entries, matching
  * the OpenAI-canonical shape the chat UI's reload hydration expects:
  *
  *   { role: 'assistant', content: <text>, tool_calls: [...] }
@@ -174,7 +174,7 @@ function buildToolReplies(message: UIMessage): ConversationMessage[] {
 }
 
 /**
- * Expand an AI-SDK `UIMessage` into one or more VibeSDK `ConversationMessage`
+ * Expand an AI-SDK `UIMessage` into one or more SuperVibe `ConversationMessage`
  * entries (user → text; assistant → text + tool_calls + per-tool replies).
  */
 function uiMessageToConversations(message: UIMessage): ConversationMessage[] {

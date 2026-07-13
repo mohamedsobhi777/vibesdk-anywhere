@@ -22,7 +22,7 @@ it for real. The live end-to-end run is the first time the whole stack executes 
    - `AgentSessionService.createAgentSession` → `agent_sessions` row.
    - `mintSessionJwt(sessionId, env)` → HS256 session JWT (`session_id` claim) signed with
      `SUPABASE_JWT_SECRET`.
-   - `bootAgentSandbox(...)` → `Sandbox.create(...)` from the `vibesdk-agent` template, runs
+   - `bootAgentSandbox(...)` → `Sandbox.create(...)` from the `supervibe-agent` template, runs
      `agent-runtime/src/main.ts` detached; returns `{ sandboxId, previewUrl }`.
    - Returns `AgentBootstrapResponse { agentId, sessionId, realtimeChannel, previewUrl, token }`.
 4. **Browser** joins the private Realtime channel `session:{sessionId}` using `token`,
@@ -44,14 +44,14 @@ Realtime contract (shared by agent + browser, from Phase 1): agent→browser bro
 
 ## 1. Build the Superserve agent template
 
-The sandbox boots from a template named **`vibesdk-agent`** (distinct from the
-deploy/preview template `vibesdk-sandbox` referenced by `SUPERSERVE_TEMPLATE`).
+The sandbox boots from a template named **`supervibe-agent`** (distinct from the
+deploy/preview template `supervibe-sandbox` referenced by `SUPERSERVE_TEMPLATE`).
 
 ```bash
 SUPERSERVE_API_KEY=ss_live_... bun run scripts/superserve/build-agent-template.ts
 ```
 
-Set `SUPERSERVE_AGENT_TEMPLATE` if you name it something other than `vibesdk-agent`.
+Set `SUPERSERVE_AGENT_TEMPLATE` if you name it something other than `supervibe-agent`.
 
 ## 2. Supabase: apply migrations
 
@@ -83,7 +83,7 @@ first migration are present (they authorize joining `session:{session_id}`).
 | `SUPABASE_SERVICE_ROLE_KEY` | service role (admin operations) |
 | `SUPABASE_JWT_SECRET` | HS256 secret to mint session JWTs — **NOT** the legacy `JWT_SECRET` |
 | `SUPERSERVE_API_KEY` | Superserve control-plane key |
-| `SUPERSERVE_AGENT_TEMPLATE` | agent template name (default `vibesdk-agent`) |
+| `SUPERSERVE_AGENT_TEMPLATE` | agent template name (default `supervibe-agent`) |
 | `SUPERSERVE_BASE_URL` | optional Superserve API base override |
 | `TEMPLATES_BASE_URL` | HTTP base the agent fetches project templates from |
 | `CLOUDFLARE_AI_GATEWAY_URL` / `_TOKEN` | optional, if routing LLM calls via AI Gateway |
@@ -139,7 +139,7 @@ These were unit-tested with fakes here and are validated for real during step 5:
   rewrites, so it is most likely inert. Confirm (or drop it) during the first real
   `vercel dev` / `vercel build`.
 - **Formatting**: the re-platform files (Phases 1/2a + this vertical) use 4-space indent;
-  the pre-existing vibesdk code uses tabs, and the repo as a whole does not currently pass
+  the pre-existing supervibe code uses tabs, and the repo as a whole does not currently pass
   `prettier --check` (prettier was never enforced repo-wide). A single repo-wide `prettier
   --write` pass is the right normalization — deferred, out of scope for the vertical (eslint,
   the actual lint gate, passes clean).

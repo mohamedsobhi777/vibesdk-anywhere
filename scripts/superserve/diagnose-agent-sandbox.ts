@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Diagnostic for the standalone agent sandbox: finds the newest agent sandbox
- * (metadata.vibesdk_kind === 'agent'), connects, and dumps what's needed to see
+ * (metadata.supervibe_kind === 'agent'), connects, and dumps what's needed to see
  * why a preview is 502-ing — the agent process log, running processes, and
  * whether the generated app's dev server is actually listening on port 8080.
  *
@@ -23,11 +23,11 @@ async function main(): Promise<void> {
 	if (!sandboxId) {
 		const all = await Sandbox.list({ apiKey, baseUrl });
 		const agents = all
-			.filter((s) => s.metadata?.vibesdk_kind === 'agent')
+			.filter((s) => s.metadata?.supervibe_kind === 'agent')
 			.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 		console.log(`Found ${agents.length} agent sandbox(es):`);
 		for (const s of agents.slice(0, 6)) {
-			console.log(`  ${s.id}  status=${s.status}  session=${s.metadata?.vibesdk_session ?? '?'}  created=${s.createdAt.toISOString()}`);
+			console.log(`  ${s.id}  status=${s.status}  session=${s.metadata?.supervibe_session ?? '?'}  created=${s.createdAt.toISOString()}`);
 		}
 		if (agents.length === 0) {
 			console.log('No agent sandbox found (retry a generation, then re-run this).');

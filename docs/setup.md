@@ -1,10 +1,10 @@
-# VibSDK Setup Guide
+# SuperVibe Setup Guide
 
-Local first time setup guide for VibSDK - get your AI coding platform running locally and also ready to be deployed. 
+Local first time setup guide for SuperVibe - get your AI coding platform running locally and also ready to be deployed. 
 
 **Make sure to read through the entire guide for important notes, and have all the required information ready before starting.**
 
-**Important Note: Cloudflare WARP has been known to cause issues with anonymous Cloudflared tunnels used in local development. It may cause previews to not load. If you experience issues with local development previews, try disabling WARP (full mode) while working with VibSDK. You may use WARP in DNS only (1.1.1.1) mode**
+**Important Note: Cloudflare WARP has been known to cause issues with anonymous Cloudflared tunnels used in local development. It may cause previews to not load. If you experience issues with local development previews, try disabling WARP (full mode) while working with SuperVibe. You may use WARP in DNS only (1.1.1.1) mode**
 
 ## Prerequisites
 
@@ -26,7 +26,7 @@ Before getting started, make sure you have:
 
 ## Quick Start
 
-The fastest way to get VibSDK running is with our automated setup script:
+The fastest way to get SuperVibe running is with our automated setup script:
 
 ```bash
 # Bun is recommended for the projec instead of npm. First install bun if you don't have it already
@@ -181,8 +181,8 @@ CUSTOM_DOMAIN="your-domain.com"
 
 Create required resources in your Cloudflare account:
 - KV Namespace for `VibecoderStore`
-- D1 Database named `vibesdk-db`
-- R2 Bucket named `vibesdk-templates`
+- D1 Database named `supervibe-db`
+- R2 Bucket named `supervibe-templates`
 
 ### 4. Update `wrangler.jsonc`
 
@@ -248,7 +248,7 @@ Visit your app at `http://localhost:5173`
 
 **Deploy to Cloudflare Button Issues (Chat Interface)**:
 - **"Deploy button not working locally"**: Chat interface deploy button requires custom domain, initial deployment, and remote dispatch bindings
-- **"Dispatch namespace not found"**: Deploy your VibSDK project to Cloudflare at least once first
+- **"Dispatch namespace not found"**: Deploy your SuperVibe project to Cloudflare at least once first
 - **"Deploy fails with authentication error"**: Ensure your custom domain is properly configured and deployed
 - **Note**: This refers to deploying generated apps from the chat interface, not GitHub repository deployments
 
@@ -317,7 +317,7 @@ Alternatively, create `.prod.vars` manually based on `.dev.vars` but with:
 Once setup is complete:
 
 1. **Start developing** with `npm run dev`
-2. **Visit** `http://localhost:5173` to access VibSDK
+2. **Visit** `http://localhost:5173` to access SuperVibe
 3. **Try generating** your first AI-powered application
 4. **Deploy to production** when ready with `npm run deploy`
 
@@ -326,7 +326,7 @@ Once setup is complete:
 The setup script creates and modifies these files:
 
 ```
-vibesdk/
+supervibe/
 ├── .dev.vars              # Local development environment variables
 ├── .prod.vars             # Production environment variables (if configured)
 ├── wrangler.jsonc         # Updated with resource IDs and domain
@@ -337,7 +337,7 @@ vibesdk/
 
 ## Summary
 
-The VibSDK setup script provides a comprehensive, intelligent configuration experience:
+The SuperVibe setup script provides a comprehensive, intelligent configuration experience:
 
 ### **Key Features:**
 - **Simplified domain setup** - One-time domain configuration with clear feature implications
@@ -379,7 +379,7 @@ For any issues during setup, check the troubleshooting section above or refer to
 
 The "Deploy to Cloudflare" button in the chat interface (for generated apps) has specific requirements for local development:
 
-> **Note**: This refers to the deployment button within the VibSDK platform's chat interface, not the GitHub repository deploy button.
+> **Note**: This refers to the deployment button within the SuperVibe platform's chat interface, not the GitHub repository deploy button.
 
 **Requirements**:
 1. **Custom domain** must be properly configured during setup
@@ -390,7 +390,7 @@ The "Deploy to Cloudflare" button in the chat interface (for generated apps) has
 **Why These Requirements?**
 - The deploy feature uses Cloudflare's dispatch namespace system
 - Dispatch requires a running worker in your account to handle deployment requests
-- Local-only development isn't yet supported for this in vibesdk
+- Local-only development isn't yet supported for this in supervibe
 
 **Current Status**: Making "Deploy to Cloudflare" work completely in local-only mode is not yet implemented.
 

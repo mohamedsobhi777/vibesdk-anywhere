@@ -183,8 +183,8 @@ export async function bootAgentSandbox(opts: {
         network: { allowOut: buildEgressAllowlist(bootEnv.supabaseUrl) },
         timeoutSeconds: resolveSandboxTimeoutSeconds(source),
         metadata: {
-            vibesdk_kind: 'agent',
-            vibesdk_session: opts.sessionId,
+            supervibe_kind: 'agent',
+            supervibe_session: opts.sessionId,
         },
     });
 
@@ -200,7 +200,7 @@ export async function bootAgentSandbox(opts: {
     // group: the sandbox host SIGKILLs the exec's process group on timeout,
     // and the agent must outlive this short-lived start command.
     await sandbox.commands.run(
-        `cd /opt/vibesdk && SELF_PREVIEW_BASE_URL='${previewUrl}' setsid nohup bun agent-runtime/src/main.ts > /workspace/agent.log 2>&1 < /dev/null & echo $!`,
+        `cd /opt/supervibe && SELF_PREVIEW_BASE_URL='${previewUrl}' setsid nohup bun agent-runtime/src/main.ts > /workspace/agent.log 2>&1 < /dev/null & echo $!`,
         { timeoutMs: START_TIMEOUT_MS },
     );
 

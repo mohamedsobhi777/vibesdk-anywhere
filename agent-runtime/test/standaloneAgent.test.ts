@@ -46,7 +46,7 @@ describe('StandaloneAgent.boot', () => {
         const agent = await StandaloneAgent.boot({
             sessionId: 's-1',
             agentId: 'a-1',
-            workspaceDir: '/tmp/vibesdk-test-s1',
+            workspaceDir: '/tmp/supervibe-test-s1',
             env: buildEnvAdapter({}),
             transport: f.transport as never,
             stateStore: f.stateStore as never,
@@ -65,7 +65,7 @@ describe('StandaloneAgent.boot', () => {
         const agent = await StandaloneAgent.boot({
             sessionId: 's-2',
             agentId: 'a-2',
-            workspaceDir: '/tmp/vibesdk-test-s2',
+            workspaceDir: '/tmp/supervibe-test-s2',
             env: buildEnvAdapter({}),
             transport: f.transport as never,
             stateStore: f.stateStore as never,
@@ -88,12 +88,12 @@ describe('StandaloneAgent.boot', () => {
             getCatalog: async () => [],
             getZip: async () => new ArrayBuffer(0),
         });
-        mkdirSync('/tmp/vibesdk-test-init', { recursive: true });
+        mkdirSync('/tmp/supervibe-test-init', { recursive: true });
         try {
             const agent = await StandaloneAgent.boot({
                 sessionId: 's-init',
                 agentId: 'a-init',
-                workspaceDir: '/tmp/vibesdk-test-init',
+                workspaceDir: '/tmp/supervibe-test-init',
                 env: buildEnvAdapter({}),
                 transport: f.transport as never,
                 stateStore: f.stateStore as never,
@@ -117,7 +117,7 @@ describe('StandaloneAgent.boot', () => {
         const agent = await StandaloneAgent.boot({
             sessionId: 's-3',
             agentId: 'a-3',
-            workspaceDir: '/tmp/vibesdk-test-s3',
+            workspaceDir: '/tmp/supervibe-test-s3',
             env: buildEnvAdapter({}),
             transport: f.transport as never,
             stateStore: f.stateStore as never,
@@ -141,7 +141,7 @@ describe('StandaloneAgent.deployProject', () => {
         const agent = await StandaloneAgent.boot({
             sessionId: 's-4',
             agentId: 'a-4',
-            workspaceDir: '/tmp/vibesdk-test-s4',
+            workspaceDir: '/tmp/supervibe-test-s4',
             env: buildEnvAdapter({}),
             transport: f.transport as never,
             stateStore: f.stateStore as never,
@@ -175,7 +175,7 @@ describe('StandaloneAgent.deployProject', () => {
         const agent = await StandaloneAgent.boot({
             sessionId: 's-5',
             agentId: 'a-5',
-            workspaceDir: '/tmp/vibesdk-test-s5',
+            workspaceDir: '/tmp/supervibe-test-s5',
             env: buildEnvAdapter({}),
             transport: f.transport as never,
             stateStore: f.stateStore as never,

@@ -71,7 +71,7 @@ describe('bootAgentSandbox', () => {
         expect(options.name).toBe('agent-session-1');
         expect(options.fromTemplate).toBe('bun-agent-runtime');
         expect(options.baseUrl).toBeUndefined();
-        expect(options.metadata).toEqual({ vibesdk_kind: 'agent', vibesdk_session: 'session-1' });
+        expect(options.metadata).toEqual({ supervibe_kind: 'agent', supervibe_session: 'session-1' });
     });
 
     it('builds the agent bootstrap envVars contract', async () => {

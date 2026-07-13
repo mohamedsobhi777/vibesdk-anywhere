@@ -995,7 +995,7 @@ export default function AppView() {
 																		'on',
 																	scrollBeyondLastLine: false,
 																	fontSize: 13,
-																	theme: 'vibesdk',
+																	theme: 'supervibe',
 																	automaticLayout: true,
 																}}
 															/>

@@ -34,7 +34,7 @@ import { Template, type BuildLogEvent } from '@superserve/sdk';
 const TEMPLATE_NAME = process.env.SUPERSERVE_AGENT_TEMPLATE ?? 'bun-agent-runtime';
 // The re-platform's `agent-runtime/` code lives in this fork; the original
 // `cloudflare/vibesdk` has the old Durable-Object code. Override via env.
-const AGENT_REPO = process.env.AGENT_TEMPLATE_REPO ?? process.env.SUPERVIBE_REPO ?? 'https://github.com/mohamedsobhi777/supervibe';
+const AGENT_REPO = process.env.AGENT_TEMPLATE_REPO ?? process.env.SUPERVIBE_REPO ?? 'https://github.com/superserve-ai/supervibe';
 const AGENT_REF = process.env.AGENT_TEMPLATE_REF ?? process.env.SUPERVIBE_REF ?? 'main';
 // Optional read-only token to clone a PRIVATE repo at build time. Injected
 // only into the clone URL and scrubbed together with `.git` before the image

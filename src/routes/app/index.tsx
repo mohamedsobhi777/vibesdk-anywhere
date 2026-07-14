@@ -666,7 +666,7 @@ export default function AppView() {
 											onClick={() =>
 												setIsDeleteDialogOpen(true)
 											}
-											className="gap-2 text-text-on-brand !border-0 bg-destructive hover:opacity-90 transition-colors"
+											className="gap-2 text-white !border-0 bg-destructive hover:opacity-90 transition-colors"
 										>
 											<Trash2 className="h-4 w-4" />
 											Delete App

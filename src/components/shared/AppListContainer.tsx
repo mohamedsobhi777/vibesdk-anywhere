@@ -185,7 +185,7 @@ export const AppListContainer: React.FC<AppListContainerProps> = ({
             >
               {/* Subtle loading indicator */}
               <div className="flex items-center justify-center py-4">
-                <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-surface-elevated/60 backdrop-blur-sm border border-border/30">
+                <div className="flex items-center gap-3 px-4 py-2 bg-surface-elevated/60 backdrop-blur-sm border border-border/30">
                   <Loader2 className="h-4 w-4 animate-spin text-accent" />
                   <span className="text-sm text-text-tertiary">Loading more amazing apps...</span>
                 </div>

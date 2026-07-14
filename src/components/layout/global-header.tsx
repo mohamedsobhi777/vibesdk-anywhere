@@ -5,11 +5,10 @@ import { ThemeToggle } from '../theme-toggle';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/auth-context';
 import { ChevronRight, AlertCircle } from 'lucide-react';
-import { SuperVibeLogo } from '../icons/logos';
 import { usePlatformStatus } from '@/hooks/use-platform-status';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Link, useLocation } from 'react-router';
+import { useLocation } from 'react-router';
 import clsx from 'clsx';
 import { UsageLimitsBadge } from '../usage-limits-badge';
 
@@ -46,21 +45,12 @@ export function GlobalHeader() {
 							{user && (
 								<SidebarTrigger className="h-8 w-8 mr-2 text-text-primary rounded-md hover:bg-accent/10 transition-colors duration-200" />
 							)}
-							<Link to="/" aria-label="Home" className="flex items-center">
-								<SuperVibeLogo
-									className="flex-shrink-0 transition-all duration-300"
-									style={{
-										width: '28px',
-										height: '28px',
-									}}
-								/>
-							</Link>
 							{hasMaintenanceMessage && (
 									<button
 										type="button"
 										onClick={hasChangeLogs ? () => setIsChangelogOpen(true) : undefined}
 										disabled={!hasChangeLogs}
-										className={`flex max-w-full items-center gap-2 rounded-full border border-accent/40 bg-bg-4/80 px-3 ml-4 py-1.5 text-xs text-text-primary shadow-sm backdrop-blur transition-colors hover:bg-accent/10 focus:outline-none focus:ring-2 focus:ring-accent/40 dark:border-accent/30 dark:bg-bg-2/80 md:text-sm${!hasChangeLogs ? ' opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
+										className={`flex max-w-full items-center gap-2 border border-accent/40 bg-bg-4/80 px-3 ml-4 py-1.5 text-xs text-text-primary shadow-sm backdrop-blur transition-colors hover:bg-accent/10 focus:outline-none focus:ring-2 focus:ring-accent/40 dark:border-accent/30 dark:bg-bg-2/80 md:text-sm${!hasChangeLogs ? ' opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
 										aria-label="Platform updates"
 									>
 										<AlertCircle className="h-4 w-4 text-accent" />

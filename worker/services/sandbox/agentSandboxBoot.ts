@@ -47,6 +47,8 @@ const DEFAULT_EGRESS_ALLOW = [
     'openrouter.ai',
     'api.cerebras.ai',
     'api.groq.com',
+    'api.x.ai',
+    'api.z.ai',
     'gateway.ai.cloudflare.com',
     'api.cloudflare.com',
 ];
@@ -165,6 +167,7 @@ export async function bootAgentSandbox(opts: {
         'OPENROUTER_API_KEY',
         'GROK_API_KEY',
         'CEREBRAS_API_KEY',
+        'ZAI_API_KEY',
         'PLATFORM_MODEL_PROVIDERS',
     ] as const;
     for (const key of AGENT_LLM_ENV_KEYS) {

@@ -76,7 +76,7 @@ export function Blueprint({
 								return (
 									<span
 										key={`framework-${framework}-${index}`}
-										className="flex items-center text-xs border border-text/20 rounded-full px-2 py-0.5 text-text-primary/90 hover:border-white/40 transition-colors"
+										className="flex items-center text-xs border border-text/20 px-2 py-0.5 text-text-primary/90 hover:border-white/40 transition-colors"
 									>
 										<span className="font-medium">{name}</span>
 										{version && (

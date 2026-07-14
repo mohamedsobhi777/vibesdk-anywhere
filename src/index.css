@@ -3,26 +3,25 @@
 
 @font-face{
   font-family: "departureMono";
-  src:  url('./assets/fonts/DepartureMono-Regular.woff') 
+  src:  url('./assets/fonts/DepartureMono-Regular.woff')
 }
 
 /* Subtle chat edge throb effect */
 @keyframes chat-edge-throb {
   0%, 100% {
     box-shadow:
-      0 0 0 0 rgba(246, 130, 31, 0.10),
-      inset 0 0 0 1px rgba(246, 130, 31, 0.16);
+      0 0 0 0 color-mix(in srgb, var(--build-accent-color) 10%, transparent),
+      inset 0 0 0 1px color-mix(in srgb, var(--build-accent-color) 16%, transparent);
   }
   50% {
     box-shadow:
-      0 0 0 6px rgba(255, 61, 0, 0.08),
-      inset 0 0 0 2px rgba(255, 61, 0, 0.22);
+      0 0 0 6px color-mix(in srgb, var(--build-accent-color) 8%, transparent),
+      inset 0 0 0 2px color-mix(in srgb, var(--build-accent-color) 22%, transparent);
   }
 }
 
 .chat-edge-throb {
   animation: chat-edge-throb 1.6s ease-in-out infinite;
-  border-radius: 0.75rem; /* rounded-xl */
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -58,12 +57,10 @@
 
 .custom-scrollbar::-webkit-scrollbar-track {
   background: rgba(0, 0, 0, 0.05);
-  border-radius: 3px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: rgba(239, 68, 68, 0.3);
-  border-radius: 3px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
@@ -85,16 +82,17 @@
 @custom-variant dark (&:is(.dark *));
 @plugin '@tailwindcss/typography';
 @theme inline {
-	--radius-sm:
-		calc(var(--radius) - 4px);
-	--radius-md:
-		calc(var(--radius) - 2px);
-	--radius-lg:
-		var(--radius);
-	--radius-xl:
-		calc(var(--radius) + 4px);
+	/* Superserve design system is square-cornered; only rounded-full survives */
+	--radius-xs: 0px;
+	--radius-sm: 0px;
+	--radius-md: 0px;
+	--radius-lg: 0px;
+	--radius-xl: 0px;
+	--radius-2xl: 0px;
 	--color-accent:
 		var(--build-accent-color);
+	--color-brand: var(--brand);
+	--color-text-on-brand: var(--text-on-brand);
 	--color-destructive:
 		var(--destructive);
 	--color-input:
@@ -122,11 +120,6 @@
 	--color-text-secondary: var(--build-chat-colors-text-secondary);
 	--color-text-tertiary: var(--build-chat-colors-text-tertiary);
 
-	--shadow-textarea:
-		6px 6px 13px 0px rgba(0, 0, 0, 0.04),
-		24px 24px 24px 0px rgba(0, 0, 0, 0.03),
-		53px 53px 32px 0px rgba(0, 0, 0, 0.02),
-		0px 0px 0px 1px rgba(217, 217, 217, 0.2);
 	--animate-typing-dot: typing-dot 1.2s ease-in-out infinite;
 	--animate-shake: shake 1s ease-in-out;
 }
@@ -134,16 +127,18 @@
 
 :root {
 	--radius:
-		0.625rem;
+		0rem;
 	--destructive:
-		oklch(0.577 0.245 27.325);
+		oklch(0.5 0.18 12);
 	--border:
 		oklch(0.922 0 0);
 	--input:
 		oklch(0.922 0 0);
 	--ring:
-		oklch(0.708 0 0);
-	--build-accent-color: #ff3d00;
+		#15803d;
+	--brand: #15803d;
+	--text-on-brand: #ffffff;
+	--build-accent-color: #15803d;
 	--build-chat-colors-bg-1: #e7e7e7;
 	--build-chat-colors-bg-2: #f6f6f6;
 	--build-chat-colors-bg-3: #fbfbfc;
@@ -151,38 +146,43 @@
 	--build-chat-colors-border-primary: #e5e5e5;
 	--build-chat-colors-border-secondary: #eeeeee;
 	--build-chat-colors-border-tertiary: #eeeeee;
-	--build-chat-colors-danger: #950000cc;
-	--build-chat-colors-brand-heavy: #f6821f;
-	--build-chat-colors-brand-primary: #f6821f;
-	--build-chat-colors-brand-subtle: #f6821f;
+	--build-chat-colors-danger: oklch(0.5 0.18 12);
+	--build-chat-colors-brand-heavy: #166534;
+	--build-chat-colors-brand-primary: #15803d;
+	--build-chat-colors-brand-subtle: #b2fab4;
 	--build-chat-colors-text-inverted: #ffffff;
-	--build-chat-colors-text-primary: #0a0a0a;
-	--build-chat-colors-text-secondary: #171717;
-	--build-chat-colors-text-tertiary: #21212199;
+	--build-chat-colors-text-primary: #141414;
+	--build-chat-colors-text-secondary: #333333;
+	--build-chat-colors-text-tertiary: rgba(20, 20, 20, 0.6);
 }
 
 .dark {
 	--destructive:
-		#ef4444; /* Error red */
+		oklch(0.5 0.18 12);
 	--border:
-		#393939; /* Primary border color */
+		rgba(255, 255, 255, 0.08);
 	--input:
-		#292929; /* Input background */
+		rgba(255, 255, 255, 0.08);
+	--ring:
+		#b2fab4;
+	--brand: #b2fab4;
+	--text-on-brand: #0a2b0c;
+	--build-accent-color: #b2fab4;
 
-	--build-chat-colors-bg-1: #151515;
-	--build-chat-colors-bg-2: #1f2020;
-	--build-chat-colors-bg-3: #292929;
-	--build-chat-colors-bg-4: #3c3c3c;
-	--build-chat-colors-border-primary: #393939;
-	--build-chat-colors-border-secondary: #454746;
-	--build-chat-colors-border-tertiary: #454746;
-	--build-chat-colors-brand-heavy: #f6821f;
-	--build-chat-colors-brand-primary: #f6821f;
-	--build-chat-colors-brand-subtle: #f6821f;
-	--build-chat-colors-text-inverted: #000000;
-	--build-chat-colors-text-primary: #ffffff;
-	--build-chat-colors-text-secondary: #cdcaca;
-	--build-chat-colors-text-tertiary: #bcb9b9;
+	--build-chat-colors-bg-1: #0a0a0a;
+	--build-chat-colors-bg-2: #101010;
+	--build-chat-colors-bg-3: #141414;
+	--build-chat-colors-bg-4: #1c1c1c;
+	--build-chat-colors-border-primary: rgba(255, 255, 255, 0.08);
+	--build-chat-colors-border-secondary: rgba(255, 255, 255, 0.12);
+	--build-chat-colors-border-tertiary: rgba(255, 255, 255, 0.12);
+	--build-chat-colors-brand-heavy: #9de89f;
+	--build-chat-colors-brand-primary: #b2fab4;
+	--build-chat-colors-brand-subtle: #b2fab4;
+	--build-chat-colors-text-inverted: #0a2b0c;
+	--build-chat-colors-text-primary: #eaeaea;
+	--build-chat-colors-text-secondary: rgba(255, 255, 255, 0.72);
+	--build-chat-colors-text-tertiary: rgba(255, 255, 255, 0.55);
 
 	--shadow-dialog:
 		0px 18px 60px 0px rgba(6, 6, 5, 0.1),
@@ -190,12 +190,12 @@
 		24px 24px 24px 0px rgba(0, 0, 0, 0.03),
 		-24px 24px 24px 0px rgba(0, 0, 0, 0.03),
 		53px 53px 32px 0px rgba(0, 0, 0, 0.02),
-		0px 0px 0px 1px rgba(217, 217, 217, 0.2);
+		0px 0px 0px 1px rgba(255, 255, 255, 0.08);
 	--shadow-elevation:
 		6px 6px 13px 0px rgba(0, 0, 0, 0.2),
 		24px 24px 24px 0px rgba(0, 0, 0, 0.17),
 		53px 53px 32px 0px rgba(0, 0, 0, 0.12),
-		0px 0px 0px 1px rgba(217, 217, 217, 0.1);
+		0px 0px 0px 1px rgba(255, 255, 255, 0.08);
 }
 
 @layer base {
@@ -211,16 +211,20 @@
 	select {
 		@apply cursor-pointer;
 	}
+	/* Brand text selection (ported from superserve platform) */
+	::selection {
+		background-color: color-mix(in srgb, var(--build-accent-color) 30%, transparent);
+		color: var(--build-accent-color);
+	}
 }
 
 @theme {
 	--font-sans:
-		'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
-		'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
-
-	--color-brand: #0092b8;
-	--color-text: #000;
-	--color-text-on-brand: #fff;
+		'Instrument Sans', ui-sans-serif, system-ui, sans-serif,
+		'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+	--font-mono:
+		'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+		monospace;
 
 	--shadow-dialog:
 		0px 18px 60px 0px rgba(6, 6, 5, 0.1),
@@ -244,8 +248,25 @@
 	position: absolute !important;
 }
 
+/* Bare `rounded` is a static .25rem in Tailwind v4 and ignores the radius
+   tokens; zero it so it matches the square design system */
+.rounded {
+	border-radius: 0;
+}
+
 @utility bg-graph-paper {
 	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cg fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.08'%3E%3Cpath opacity='.5' d='M96 95h4v1h-4v4h-1v-4h-9v4h-1v-4h-9v4h-1v-4h-9v4h-1v-4h-9v4h-1v-4h-9v4h-1v-4h-9v4h-1v-4h-9v4h-1v-4h-9v4h-1v-4H0v-1h15v-9H0v-1h15v-9H0v-1h15v-9H0v-1h15v-9H0v-1h15v-9H0v-1h15v-9H0v-1h15v-9H0v-1h15v-9H0v-1h15v-9H0v-1h15v-9H0v-1h15v-9H0v-1h15V0h1v15h9V0h1v15h9V0h1v15h9V0h1v15h9V0h1v15h9V0h1v15h9V0h1v15h9V0h1v15h9V0h1v15h9V0h1v15h4v1h-4v9h4v1h-4v9h4v1h-4v9h4v1h-4v9h4v1h-4v9h4v1h-4v9h4v1h-4v9h4v1h-4v9zm-1 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-9-10h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm9-10v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-9-10h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm9-10v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-10 0v-9h-9v9h9zm-9-10h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9zm10 0h9v-9h-9v9z'/%3E%3Cpath d='M6 5V0H5v5H0v1h5v94h1V6h94V5H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* Slanted hatch texture for terminal/section headers (ported from superserve platform) */
+@utility stripes-slanted {
+	background-image: repeating-linear-gradient(
+		-45deg,
+		transparent 0,
+		transparent 6px,
+		rgba(255, 255, 255, 0.05) 6px,
+		rgba(255, 255, 255, 0.05) 7px
+	);
 }
 
 ::-webkit-scrollbar {
@@ -254,22 +275,25 @@
 	background-color: transparent;
 }
 
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+
 ::-webkit-scrollbar-thumb {
-	background-color: rgba(0, 0, 0, 0.2);
-	border-radius: 4px;
+	background-color: rgba(0, 0, 0, 0.15);
 	transition: background-color 0.2s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-	background-color: rgba(0, 0, 0, 0.3);
+	background-color: color-mix(in srgb, var(--build-accent-color) 50%, transparent);
 }
 
 .dark ::-webkit-scrollbar-thumb {
-	background-color: rgba(255, 255, 255, 0.2);
+	background-color: rgba(255, 255, 255, 0.1);
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {
-	background-color: rgba(255, 255, 255, 0.3);
+	background-color: color-mix(in srgb, var(--build-accent-color) 50%, transparent);
 }
 
 ::-webkit-scrollbar-corner {
@@ -283,12 +307,10 @@
 
 .phase-timeline-scroll::-webkit-scrollbar-track {
 	background: rgba(0, 0, 0, 0.05);
-	border-radius: 3px;
 }
 
 .phase-timeline-scroll::-webkit-scrollbar-thumb {
 	background: rgba(0, 0, 0, 0.2);
-	border-radius: 3px;
 }
 
 .phase-timeline-scroll::-webkit-scrollbar-thumb:hover {
@@ -323,13 +345,13 @@
 .prose {
 	/* --tw-prose-invert-counters: rgb(156, 187, 192); */
 	/* --tw-prose-invert-bullets: rgb(156, 187, 192); */
-	--tw-prose-th-headers: --value(var(--color-text));
-	--tw-prose-body: --value(var(--color-text));
-	--tw-prose-headings: --value(var(--color-text));
-	--tw-prose-code: --value(var(--color-text));
-	--tw-prose-bold: --value(var(--color-text));
-	--tw-prose-quotes: --value(var(--color-text));
-	--tw-prose-counters: --value(var(--color-text));
+	--tw-prose-th-headers: --value(var(--color-text-primary));
+	--tw-prose-body: --value(var(--color-text-primary));
+	--tw-prose-headings: --value(var(--color-text-primary));
+	--tw-prose-code: --value(var(--color-text-primary));
+	--tw-prose-bold: --value(var(--color-text-primary));
+	--tw-prose-quotes: --value(var(--color-text-primary));
+	--tw-prose-counters: --value(var(--color-text-primary));
 }
 
 /* Chat messages custom scrollbar */
@@ -343,7 +365,6 @@
 
 .chat-messages-scroll::-webkit-scrollbar-thumb {
 	background: rgba(0, 0, 0, 0.1);
-	border-radius: 4px;
 }
 
 .chat-messages-scroll::-webkit-scrollbar-thumb:hover {
@@ -365,12 +386,10 @@
 
 .terminal-scroll::-webkit-scrollbar-track {
 	background: rgba(0, 0, 0, 0.05);
-	border-radius: 4px;
 }
 
 .terminal-scroll::-webkit-scrollbar-thumb {
 	background: rgba(0, 0, 0, 0.15);
-	border-radius: 4px;
 	transition: background-color 0.2s ease;
 }
 

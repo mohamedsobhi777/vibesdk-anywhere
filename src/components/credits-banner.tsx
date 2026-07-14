@@ -168,7 +168,7 @@ function useBannerInfo(limitsData?: UsageSummary | null): { bannerInfo: BannerIn
 	return { bannerInfo, dismiss: () => setIsDismissed(true) };
 }
 
-export function CreditsBanner({ limitsData, className, children, radius = 12 }: CreditsBannerProps) {
+export function CreditsBanner({ limitsData, className, children, radius = 0 }: CreditsBannerProps) {
 	const { bannerInfo, dismiss } = useBannerInfo(limitsData);
 
 	if (children) {

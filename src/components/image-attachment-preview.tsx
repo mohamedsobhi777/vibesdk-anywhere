@@ -41,7 +41,7 @@ export function ImageAttachmentPreview({
 							<button
 								type="button"
 								onClick={() => onRemove(image.id)}
-								className="absolute top-1 right-1 p-0.5 rounded-full bg-bg-1/90 hover:bg-bg-1 text-text-primary opacity-0 group-hover:opacity-100 transition-opacity"
+								className="absolute top-1 right-1 p-0.5 bg-bg-1/90 hover:bg-bg-1 text-text-primary opacity-0 group-hover:opacity-100 transition-opacity"
 								aria-label={`Remove ${image.filename}`}
 							>
 								<X className="size-3" />

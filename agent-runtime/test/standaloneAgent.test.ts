@@ -109,6 +109,85 @@ describe('StandaloneAgent.boot', () => {
         }
     });
 
+    it('seeds active skills from init_args into fresh-session state, dropping malformed entries', async () => {
+        const f = fakes();
+        setTemplateSource({
+            getCatalog: async () => [],
+            getZip: async () => new ArrayBuffer(0),
+        });
+        mkdirSync('/tmp/supervibe-test-skills', { recursive: true });
+        try {
+            const agent = await StandaloneAgent.boot({
+                sessionId: 's-skills',
+                agentId: 'a-skills',
+                workspaceDir: '/tmp/supervibe-test-skills',
+                env: buildEnvAdapter({}),
+                transport: f.transport as never,
+                stateStore: f.stateStore as never,
+                conversationStore: f.conversationStore as never,
+                sandbox: { shutdownInstance: async () => ({ success: true }) } as never,
+                initArgs: {
+                    query: 'build a todo app',
+                    activeSkills: [
+                        { id: 'skill-1', name: 'Design', description: 'Design rules', content: '# Rules' },
+                        { id: 'bad', name: 'Broken' }, // missing description/content — dropped
+                        'not-an-object',
+                    ],
+                },
+            });
+            expect(agent.state.activeSkills).toEqual([
+                { id: 'skill-1', name: 'Design', description: 'Design rules', content: '# Rules' },
+            ]);
+        } finally {
+            resetTemplateSourceForTests();
+        }
+    });
+
+    it('rehydrated sessions keep the skills snapshot in persisted state and ignore later init_args edits', async () => {
+        const f = fakes();
+        const persistedSkill = { id: 'skill-old', name: 'Original', description: 'Frozen at creation', content: 'original content' };
+        mkdirSync('/tmp/supervibe-test-skills-rehydrate', { recursive: true });
+        const persistedState = {
+            behaviorType: 'agentic',
+            projectType: 'app',
+            projectName: 'existing-project',
+            query: 'build a todo app',
+            sessionId: 's-rehydrate',
+            hostname: '',
+            blueprint: { title: 't', projectName: 'existing-project', description: 'd', colorPalette: [], frameworks: [], plan: [] },
+            templateName: 'scratch', // skips template fetch on rehydrate
+            generatedFilesMap: {},
+            metadata: { agentId: 'a-rehydrate', userId: 'u-1' },
+            shouldBeGenerating: false,
+            commandsHistory: [],
+            lastPackageJson: '',
+            pendingUserInputs: [],
+            projectUpdatesAccumulator: [],
+            activeSkills: [persistedSkill],
+            lastDeepDebugTranscript: null,
+            mvpGenerated: false,
+            reviewingInitiated: false,
+            currentPlan: '',
+        };
+        const agent = await StandaloneAgent.boot({
+            sessionId: 's-rehydrate',
+            agentId: 'a-rehydrate',
+            workspaceDir: '/tmp/supervibe-test-skills-rehydrate',
+            env: buildEnvAdapter({}),
+            transport: f.transport as never,
+            stateStore: { ...f.stateStore, load: async () => persistedState } as never,
+            conversationStore: f.conversationStore as never,
+            sandbox: { shutdownInstance: async () => ({ success: true }) } as never,
+            initArgs: {
+                query: 'build a todo app',
+                activeSkills: [
+                    { id: 'skill-new', name: 'Edited later', description: 'Must not apply', content: 'edited content' },
+                ],
+            },
+        });
+        expect(agent.state.activeSkills).toEqual([persistedSkill]);
+    });
+
     it('maps an explicit think request to the agentic behavior instead of crashing', async () => {
         const f = fakes();
         // No query, so this exercises behavior selection only (no project

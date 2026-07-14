@@ -524,7 +524,7 @@ export function PhaseTimeline({
                                 </div>
                                 {collapsedBarInfo.badge && (
                                     <div className="flex-shrink-0">
-                                        <span className="text-xs font-medium px-2 py-0.5 bg-accent/10 text-accent rounded-full">
+                                        <span className="text-xs font-medium px-2 py-0.5 bg-accent/10 text-accent">
                                             {collapsedBarInfo.badge}
                                         </span>
                                     </div>
@@ -536,7 +536,7 @@ export function PhaseTimeline({
                                             handleDeployToCloudflare(chatId);
                                         }}
                                         disabled={!!isDeploying}
-                                        className="ml-2 flex items-center gap-1.5 px-2.5 py-1 bg-accent hover:bg-accent/90 disabled:bg-accent/50 text-white rounded-full text-xs font-medium transition-colors disabled:cursor-not-allowed"
+                                        className="ml-2 flex items-center gap-1.5 px-2.5 py-1 bg-accent hover:bg-accent/90 disabled:bg-accent/50 text-text-on-brand text-xs font-medium transition-colors disabled:cursor-not-allowed"
                                         title={isDeploying ? 'Opening preview...' : 'Open preview'}
                                         aria-label={isDeploying ? 'Opening preview' : 'Open preview'}
                                     >

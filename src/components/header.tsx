@@ -1,6 +1,6 @@
 import React from 'react';
 import clsx from 'clsx';
-import { SuperVibeLogo } from './icons/logos';
+import { SuperserveLogo } from './icons/logos';
 import { Link } from 'react-router';
 
 export function Header({
@@ -16,9 +16,9 @@ export function Header({
 		>
 			<h1 className="flex items-center gap-2 mx-4">
 				<Link to="/">
-					<SuperVibeLogo
-						className="h-4 text-bg-bright-dim"
-						aria-label="SuperVibe"
+					<SuperserveLogo
+						className="size-5 text-brand"
+						aria-label="Superserve"
 					/>
 				</Link>
 			</h1>

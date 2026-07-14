@@ -521,7 +521,7 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
       {/* Toggle Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`fixed bottom-6 right-6 z-50 p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-105 ${
+        className={`fixed bottom-6 right-6 z-50 p-3 shadow-lg transition-all duration-300 hover:scale-105 ${
           (errorCount > 0 || warningCount > 0) && !isOpen
             ? 'bg-red-500 text-white animate-pulse'
             : 'bg-zinc-800 text-white hover:bg-zinc-700'
@@ -530,7 +530,7 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
       >
         <Bug className="w-4 h-4" />
         {(errorCount > 0 || warningCount > 0) && (
-          <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+          <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-1.5 py-0.5">
             {errorCount > 0 ? errorCount : warningCount}
           </span>
         )}
@@ -548,11 +548,11 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
           <div className="flex items-center gap-2">
             <Bug className="w-5 h-5 text-text-primary" />
             <h3 className="font-semibold text-text-primary">Debug Console</h3>
-            <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full">
+            <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1">
               {filteredMessages.length}/{messages.length}
             </span>
             {bookmarkedMessages.size > 0 && (
-              <span className="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded-full flex items-center gap-1">
+              <span className="bg-amber-100 text-amber-700 text-xs px-2 py-1 flex items-center gap-1">
                 <Bookmark className="w-3 h-3" />
                 {bookmarkedMessages.size}
               </span>
@@ -652,7 +652,7 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
                     setWsFilter('all'); // Reset WebSocket filter when not filtering by WebSocket
                   }
                 }}
-                className={`px-3 py-1 text-xs rounded-full transition-all ${
+                className={`px-3 py-1 text-xs transition-all ${
                   filter === key
                     ? 'bg-blue-500 text-white'
                     : 'bg-bg-3 text-text-primary hover:bg-bg-3 border border-border-primary'
@@ -1037,7 +1037,7 @@ function DebugPanelCore({ messages, onClear, chatSessionId }: DebugPanelProps) {
                           {message.type}
                         </span>
                         {message.messageType && (
-                          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-mono dark:bg-purple-900/40 dark:text-purple-200 dark:border dark:border-purple-800">
+                          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 font-mono dark:bg-purple-900/40 dark:text-purple-200 dark:border dark:border-purple-800">
                             {message.messageType}
                           </span>
                         )}

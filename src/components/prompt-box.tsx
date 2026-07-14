@@ -123,7 +123,6 @@ export function PromptBox({
 
 	const isCompact = variant === 'compact';
 	const maxHeight = isCompact ? 120 : 300;
-	const borderRadius = isCompact ? 12 : 18;
 
 	const autoResize = (el: HTMLTextAreaElement) => {
 		el.style.height = 'auto';
@@ -197,13 +196,12 @@ export function PromptBox({
 		<CreditsBanner
 			limitsData={limitsData}
 			className={clsx('w-full z-10', className)}
-			radius={borderRadius}
 		>
-			<div className="w-full rounded-[18px] bg-bg-4 dark:bg-bg-2 border border-accent/30 shadow-textarea focus-within:border-accent/60 focus-within:ring-4 focus-within:ring-accent/10 transition-all duration-200">
+			<div className="w-full bg-bg-4 dark:bg-bg-2 border border-accent/30 shadow-textarea focus-within:border-accent/60 focus-within:ring-4 focus-within:ring-accent/10 transition-all duration-200">
 				<form
 					ref={formRef}
 					onSubmit={handleSubmit}
-					className="flex z-10 flex-col w-full min-h-[150px] bg-bg-4 ring-0 dark:bg-bg-2 rounded-[18px] p-5 transition-all duration-200"
+					className="flex z-10 flex-col w-full min-h-[150px] bg-bg-4 ring-0 dark:bg-bg-2 p-5 transition-all duration-200"
 				>
 					<div
 						className={clsx(

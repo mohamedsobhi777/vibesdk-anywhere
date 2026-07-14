@@ -118,7 +118,7 @@ export function ModelConfigInfo({ configs, onRequestConfigs, loading }: ModelCon
 		<>
 			<button
 				onClick={handleOpen}
-				className="group relative flex items-center gap-1.5 p-1.5 group-hover:pl-2 group-hover:pr-2.5 rounded-full group-hover:rounded-md transition-all duration-300 ease-in-out hover:bg-bg-4 border border-transparent hover:border-border-primary hover:shadow-sm overflow-hidden"
+				className="group relative flex items-center gap-1.5 p-1.5 group-hover:pl-2 group-hover:pr-2.5 transition-all duration-300 ease-in-out hover:bg-bg-4 border border-transparent hover:border-border-primary hover:shadow-sm overflow-hidden"
 				title="View current model configurations"
 				type="button"
 			>

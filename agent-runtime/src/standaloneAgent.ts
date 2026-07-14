@@ -35,9 +35,12 @@ import type {
     ProjectType,
 } from 'worker/agents/core/types';
 import type { Blueprint, TemplateSelection } from 'worker/agents/schemas';
-import type { InferenceContext, InferenceMetadata } from 'worker/agents/inferutils/config.types';
+import type { AgentActionKey, InferenceContext, InferenceMetadata, ModelConfig } from 'worker/agents/inferutils/config.types';
+import { toAIModel } from 'worker/agents/inferutils/config.types';
+import { buildUserModelConfigsForSelectedModel } from 'worker/agents/inferutils/config';
 import type { ConversationMessage, ConversationState } from 'worker/agents/inferutils/common';
 import type { ImageAttachment } from 'worker/types/image-attachment';
+import type { ActiveSkillSnapshot } from 'shared/types/skills';
 import type { WebSocketMessageData, WebSocketMessageType } from 'worker/api/websocketTypes';
 import type { TemplateDetails } from 'worker/services/sandbox/sandboxTypes';
 import { setSandboxServiceFactory } from 'worker/services/sandbox/factory';
@@ -105,6 +108,7 @@ function buildInitialState(sessionId: string, agentId: string, userId: string): 
         lastPackageJson: '',
         pendingUserInputs: [],
         projectUpdatesAccumulator: [],
+        activeSkills: [],
         lastDeepDebugTranscript: null,
         mvpGenerated: false,
         reviewingInitiated: false,
@@ -131,6 +135,26 @@ interface StandaloneInitArgs {
     projectType?: ProjectType;
     query?: string;
     userId?: string;
+    /** AIModels id chosen on the front page; applied to the main generation actions. */
+    selectedModel?: string;
+    /** Active custom skills snapshotted at session creation. */
+    activeSkills?: unknown;
+}
+
+/**
+ * init_args is loosely-typed jsonb, so validate the skill snapshot shape
+ * before trusting it. Malformed entries are dropped rather than crashing
+ * the boot.
+ */
+function parseActiveSkills(raw: unknown): ActiveSkillSnapshot[] {
+    if (!Array.isArray(raw)) return [];
+    return raw.filter((entry): entry is ActiveSkillSnapshot =>
+        typeof entry === 'object' && entry !== null &&
+        typeof (entry as ActiveSkillSnapshot).id === 'string' &&
+        typeof (entry as ActiveSkillSnapshot).name === 'string' &&
+        typeof (entry as ActiveSkillSnapshot).description === 'string' &&
+        typeof (entry as ActiveSkillSnapshot).content === 'string'
+    );
 }
 
 export class StandaloneAgent implements AgentHost {
@@ -138,6 +162,8 @@ export class StandaloneAgent implements AgentHost {
     private _logger: StructuredLogger | undefined;
     private behavior!: BaseCodingBehavior<AgentState>;
     private objective!: ProjectObjective<BaseProjectState>;
+    /** Per-action overrides derived from `initArgs.selectedModel`; undefined = AGENT_CONFIG defaults. */
+    private selectedModelConfigs?: Record<AgentActionKey, ModelConfig>;
     /** Hydrated once at boot; kept in sync on every mutation (crib note: sync interface over an async store). */
     private conversationCache!: ConversationState;
 
@@ -298,14 +324,23 @@ export class StandaloneAgent implements AgentHost {
 
         await this.behavior.onStart({ behaviorType, projectType });
 
-        // Phase-1 stub: skip the ModelConfigService D1 read entirely. Passing
-        // `undefined` (rather than an empty object, which cannot structurally
-        // satisfy the full per-action Record<AgentActionKey, ModelConfig> the
-        // real D1-backed service always returns) leaves userModelConfigs
-        // unset, so downstream inference calls fall back to AGENT_CONFIG
-        // defaults for every action — the same effective behavior the crib
-        // describes as "empty record; AGENT_CONFIG defaults apply".
-        this.behavior.setUserModelConfigs(undefined);
+        // Standalone runtime has no D1-backed per-user model config store; the
+        // only override source is the front-page model selection persisted in
+        // `agent_sessions.init_args.selectedModel`. When present (and valid),
+        // route the main generation actions to it; otherwise pass `undefined`
+        // so downstream inference falls back to AGENT_CONFIG defaults for
+        // every action. init_args is re-read on every boot, so the selection
+        // survives sandbox restarts.
+        const selectedModel = toAIModel(initArgs.selectedModel);
+        if (initArgs.selectedModel && !selectedModel) {
+            this.logger().warn('Ignoring unknown selectedModel from init_args', {
+                selectedModel: initArgs.selectedModel,
+            });
+        }
+        this.selectedModelConfigs = selectedModel
+            ? buildUserModelConfigsForSelectedModel(selectedModel)
+            : undefined;
+        this.behavior.setUserModelConfigs(this.selectedModelConfigs);
 
         if (!this.state.query) {
             // Fresh session. If the boot request carried a query, run the
@@ -316,7 +351,7 @@ export class StandaloneAgent implements AgentHost {
             // generation — nothing to initialize.
             const requestedQuery = initArgs.query?.trim();
             if (requestedQuery) {
-                await this.initializeProject(requestedQuery, projectType);
+                await this.initializeProject(requestedQuery, projectType, parseActiveSkills(initArgs.activeSkills));
                 this.startInitialGeneration();
             }
             return;
@@ -364,11 +399,12 @@ export class StandaloneAgent implements AgentHost {
      * Without this, `generateAllFiles()` reaches `ensureTemplateDetails()` with
      * an empty `templateName` and 404s, so generation can never start.
      */
-    private async initializeProject(query: string, projectType: ProjectType): Promise<void> {
+    private async initializeProject(query: string, projectType: ProjectType, activeSkills: ActiveSkillSnapshot[] = []): Promise<void> {
         const inferenceContext: InferenceContext = {
             metadata: this.state.metadata,
             enableFastSmartCodeFix: false,
             enableRealtimeCodeFix: false,
+            userModelConfigs: this.selectedModelConfigs,
         };
 
         const templateInfo = await this.resolveTemplateInfo(query, projectType, inferenceContext);
@@ -382,6 +418,7 @@ export class StandaloneAgent implements AgentHost {
             inferenceContext,
             sandboxSessionId: this.sessionId,
             templateInfo,
+            activeSkills,
             onBlueprintChunk: (chunk: string) => {
                 this.broadcast('blueprint_chunk', { chunk });
             },

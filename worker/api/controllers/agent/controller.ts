@@ -2,15 +2,18 @@ import { BaseController } from '../baseController';
 import { generateId } from '../../../utils/idGenerator';
 import { BehaviorType, ProjectType } from '../../../agents/core/types';
 import { getBehaviorTypeForProject } from '../../../agents/core/features';
+import { toAIModel } from '../../../agents/inferutils/config.types';
 import {
     AgentBootstrapResponse,
     CodeGenArgs,
     MAX_AGENT_QUERY_LENGTH,
 } from './types';
 import { SecurityError, SecurityErrorType } from 'shared/types/errors';
+import { ActiveSkillSnapshot } from 'shared/types/skills';
 import { RouteContext } from '../../types/route-context';
 import { AppService } from '../../../database';
 import { AgentSessionService } from '../../../database/services/AgentSessionService';
+import { SkillsService } from '../../../database/services/SkillsService';
 import { mintSessionJwt } from '../../../services/auth/sessionJwt';
 import { bootAgentSandbox, getAgentPreviewUrl } from '../../../services/sandbox/agentSandboxBoot';
 import { createLogger } from '../../../logger';
@@ -71,6 +74,17 @@ export class CodingAgentController extends BaseController {
             const agentId = generateId();
             const sessionId = agentId;
 
+            // Snapshot the user's active skills into init_args so the
+            // sandboxed runtime never needs skill DB access and running
+            // sessions are immune to later skill edits. Resolution failures
+            // must never block session creation.
+            let activeSkills: ActiveSkillSnapshot[] = [];
+            try {
+                activeSkills = await new SkillsService(env).resolveActiveSkillsSnapshot(user.id);
+            } catch (error) {
+                this.logger.error('Failed to resolve active skills; continuing without them', error);
+            }
+
             await new AppService(env).createApp({
                 id: agentId,
                 title: query.slice(0, 100) || 'Untitled App',
@@ -78,6 +92,13 @@ export class CodingAgentController extends BaseController {
                 userId: user.id,
                 status: 'generating',
             });
+
+            // Validate the front-page model selection against the model
+            // registry; unknown ids are dropped so defaults apply.
+            const selectedModel = toAIModel(body.selectedModel);
+            if (body.selectedModel && !selectedModel) {
+                this.logger.warn('Ignoring unknown selectedModel', { selectedModel: body.selectedModel });
+            }
 
             await new AgentSessionService(env).createAgentSession({
                 sessionId,
@@ -87,6 +108,8 @@ export class CodingAgentController extends BaseController {
                     query,
                     projectType: resolveProjectType(body),
                     behaviorType: resolveBehaviorType(body),
+                    ...(selectedModel ? { selectedModel } : {}),
+                    ...(activeSkills.length > 0 ? { activeSkills } : {}),
                 },
             });
 

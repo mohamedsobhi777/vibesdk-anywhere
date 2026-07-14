@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router';
 import { useAuth } from '@/contexts/auth-context';
 import { ProjectModeSelector, type ProjectModeOption } from '../components/project-mode-selector';
 import { BehaviorModeToggle } from '../components/behavior-mode-toggle';
+import { ModelPicker, DEFAULT_MODEL_OPTION } from '../components/model-picker';
 import { MAX_AGENT_QUERY_LENGTH, SUPPORTED_IMAGE_MIME_TYPES, type ProjectType, type BehaviorType } from '@/api-types';
 import { useFeature } from '@/features';
 import { useAuthGuard } from '../hooks/useAuthGuard';
@@ -24,6 +25,7 @@ export default function Home() {
 	const { requireAuth } = useAuthGuard();
 	const [projectMode, setProjectMode] = useState<ProjectType>('app');
 	const [behaviorMode, setBehaviorMode] = useState<Extract<BehaviorType, 'think' | 'phasic'>>('think');
+	const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL_OPTION);
 	const [query, setQuery] = useState('');
 	const { user } = useAuth();
 	const { isLoadingCapabilities, capabilities, getEnabledFeatures } = useFeature();
@@ -107,7 +109,8 @@ export default function Home() {
 
 		// Encode images as JSON if present
 		const imageParam = images.length > 0 ? `&images=${encodeURIComponent(JSON.stringify(images))}` : '';
-		const intendedUrl = `/chat/new?query=${encodedQuery}&projectType=${encodedMode}${behaviorParam}${imageParam}`;
+		const modelParam = selectedModel !== DEFAULT_MODEL_OPTION ? `&modelId=${encodeURIComponent(selectedModel)}` : '';
+		const intendedUrl = `/chat/new?query=${encodedQuery}&projectType=${encodedMode}${behaviorParam}${imageParam}${modelParam}`;
 
 		if (
 			!requireAuth({
@@ -205,24 +208,26 @@ export default function Home() {
 							variant="expanded"
 							submitIcon={user && usageLimitsLoading ? <Loader2 className="animate-spin" /> : <ArrowRight />}
 							leftActions={
-								(showModeSelector || projectMode === 'app') ? (
-									<div className="flex items-center gap-3">
-										{showModeSelector && (
-											<ProjectModeSelector
-												value={projectMode}
-												onChange={setProjectMode}
-												modes={modeOptions}
-												className="flex-1"
-											/>
-										)}
-										{projectMode === 'app' && (
-											<BehaviorModeToggle
-												value={behaviorMode}
-												onChange={setBehaviorMode}
-											/>
-										)}
-									</div>
-								) : undefined
+								<div className="flex items-center gap-3">
+									{showModeSelector && (
+										<ProjectModeSelector
+											value={projectMode}
+											onChange={setProjectMode}
+											modes={modeOptions}
+											className="flex-1"
+										/>
+									)}
+									{projectMode === 'app' && (
+										<BehaviorModeToggle
+											value={behaviorMode}
+											onChange={setBehaviorMode}
+										/>
+									)}
+									<ModelPicker
+										value={selectedModel}
+										onChange={setSelectedModel}
+									/>
+								</div>
 							}
 						/>
 						<div className="mt-4 flex w-full flex-wrap items-center gap-2">
@@ -231,7 +236,7 @@ export default function Home() {
 									key={phrase}
 									type="button"
 									onClick={() => setQuery(`Create a ${phrase}`)}
-									className="rounded-full border border-border-primary bg-bg-4/70 dark:bg-bg-2/70 px-3.5 py-1.5 text-xs text-text-tertiary transition-all duration-200 hover:border-accent/40 hover:text-text-primary active:scale-[0.98]"
+									className="border border-border-primary bg-bg-4/70 dark:bg-bg-2/70 px-3.5 py-1.5 text-xs text-text-tertiary transition-all duration-200 hover:border-accent/40 hover:text-text-primary active:scale-[0.98]"
 								>
 									{phrase}
 								</button>

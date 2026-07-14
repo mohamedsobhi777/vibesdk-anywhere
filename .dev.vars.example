@@ -17,6 +17,8 @@
 GOOGLE_AI_STUDIO_API_KEY=""
 #OPENROUTER_API_KEY="default" 
 #GROQ_API_KEY="default" 
+#GROK_API_KEY="" # xAI Grok models
+#ZAI_API_KEY="" # Z.ai GLM models
  
 # Stuff for Oauths:
 #GOOGLE_CLIENT_SECRET=""

@@ -51,6 +51,7 @@ export function useChat({
 	images: userImages,
 	projectType = 'app',
 	behaviorType: explicitBehaviorType,
+	selectedModel,
 	autoStart = true,
 	onDebugMessage,
 	onTerminalMessage,
@@ -61,6 +62,8 @@ export function useChat({
 	images?: ImageAttachment[];
 	projectType?: ProjectType;
 	behaviorType?: BehaviorType;
+	/** AIModels id chosen on the front page; forwarded to session creation. */
+	selectedModel?: string;
 	/**
 	 * Whether a brand-new session may be created automatically on mount.
 	 * In-app navigation (e.g. the home prompt box) sets this true. Sessions
@@ -485,6 +488,7 @@ export function useChat({
 						projectType,
 						behaviorType: explicitBehaviorType,
 						images: userImages, // Pass images from URL params for multi-modal blueprint
+						selectedModel, // Front-page model choice; backend validates against the registry
 					});
 
 					setIsBootstrapping(false);
@@ -550,6 +554,7 @@ export function useChat({
 	}, [
 		projectType,
 		explicitBehaviorType,
+		selectedModel,
 		connectChannel,
 		onDebugMessage,
 		sendMessage,

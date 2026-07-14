@@ -166,6 +166,48 @@ const MODELS_MASTER = {
             contextSize: 200000, // 200K Context
         }
     },
+    CLAUDE_4_8_OPUS: {
+        id: 'anthropic/claude-opus-4-8',
+        config: {
+            name: 'Claude 4.8 Opus',
+            size: ModelSize.LARGE,
+            provider: 'anthropic',
+            creditCost: 20, // $5.00
+            contextSize: 1000000, // 1M Context
+        }
+    },
+    CLAUDE_5_SONNET: {
+        id: 'anthropic/claude-sonnet-5',
+        config: {
+            name: 'Claude 5 Sonnet',
+            size: ModelSize.LARGE,
+            provider: 'anthropic',
+            creditCost: 12, // $3.00
+            contextSize: 1000000, // 1M Context
+        }
+    },
+    CLAUDE_FABLE_5: {
+        id: 'anthropic/claude-fable-5',
+        config: {
+            name: 'Claude Fable 5',
+            size: ModelSize.LARGE,
+            provider: 'anthropic',
+            creditCost: 40, // $10.00
+            contextSize: 1000000, // 1M Context
+        }
+    },
+
+    // --- Z.ai Models ---
+    GLM_5_2: {
+        id: 'zai/glm-5.2',
+        config: {
+            name: 'GLM 5.2',
+            size: ModelSize.LARGE,
+            provider: 'zai',
+            creditCost: 2.4, // ~$0.60
+            contextSize: 200000, // 200K Context
+        }
+    },
 
     // --- OpenAI Models ---
     OPENAI_5: {

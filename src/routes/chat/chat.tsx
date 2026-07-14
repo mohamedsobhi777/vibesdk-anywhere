@@ -67,6 +67,7 @@ export default function Chat() {
 	const userQuery = searchParams.get('query');
 	const urlProjectType = searchParams.get('projectType') || 'app';
 	const urlBehaviorType = searchParams.get('behaviorType') as BehaviorType | null;
+	const urlModelId = searchParams.get('modelId');
 
 	// Only auto-start a brand-new session when it originated from in-app
 	// navigation (e.g. the home prompt box sets `fromPrompt`). Sessions opened
@@ -189,6 +190,7 @@ export default function Chat() {
 		images: userImages,
 		projectType: urlProjectType as ProjectType,
 		behaviorType: urlBehaviorType ?? undefined,
+		selectedModel: urlModelId ?? undefined,
 		autoStart,
 		onDebugMessage: addDebugMessage,
 		onVaultUnlockRequired: handleVaultUnlockRequired,

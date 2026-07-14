@@ -5,6 +5,7 @@ import {
     AIModels,
     AllModels,
     LiteModels,
+    ModelConfig,
     RegularModels,
 } from "./config.types";
 import { getRuntimeEnv } from 'worker/utils/runtimeEnv';
@@ -128,7 +129,7 @@ const PLATFORM_AGENT_CONFIG: AgentConfig = {
  * OpenAI reasoning models, so tuning it here is safe for other providers too).
  * To use a different provider, point these at that provider's models (and set
  * its API key) — the direct-routing in core.ts handles google-ai-studio,
- * anthropic, openai, grok, and openrouter without a gateway.
+ * anthropic, openai, grok, zai, and openrouter without a gateway.
  */
 const SHARED_OPENAI_IMPLEMENTATION_CONFIG = {
     reasoning_effort: 'medium' as const,
@@ -227,6 +228,47 @@ export const AGENT_CONFIG: AgentConfig = new Proxy({} as AgentConfig, {
     },
 });
 
+
+/**
+ * Agent actions a session-level model selection (the front-page model picker)
+ * applies to. Actions pinned by AGENT_CONSTRAINTS to a fixed model set (code
+ * fixers, template selection) and utility actions like screenshot analysis
+ * keep their tuned defaults regardless of the selection.
+ */
+const USER_SELECTABLE_MODEL_ACTIONS: readonly AgentActionKey[] = [
+    'blueprint',
+    'projectSetup',
+    'phaseGeneration',
+    'phaseImplementation',
+    'firstPhaseImplementation',
+    'fileRegeneration',
+    'conversationalResponse',
+    'deepDebugger',
+    'agenticProjectBuilder',
+];
+
+/**
+ * Builds a per-action model config record that routes the main generation
+ * actions to a user-selected model while keeping each action's tuned
+ * defaults for everything else. The selected model keeps the action's
+ * default model as its fallback, and resolveModelConfig() still validates
+ * the selection against AGENT_CONSTRAINTS per action, so a constrained
+ * action silently falls back to its default.
+ */
+export function buildUserModelConfigsForSelectedModel(
+    model: AIModels,
+): Record<AgentActionKey, ModelConfig> {
+    const entries = (Object.entries(AGENT_CONFIG) as [AgentActionKey, ModelConfig][]).map(
+        ([key, config]) =>
+            [
+                key,
+                USER_SELECTABLE_MODEL_ACTIONS.includes(key)
+                    ? { ...config, name: model, fallbackModel: config.name }
+                    : { ...config },
+            ] as const,
+    );
+    return Object.fromEntries(entries) as Record<AgentActionKey, ModelConfig>;
+}
 
 export const AGENT_CONSTRAINTS: Map<AgentActionKey, AgentConstraintConfig> = new Map([
 	['fastCodeFixer', {

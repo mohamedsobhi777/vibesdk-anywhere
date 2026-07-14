@@ -14,6 +14,13 @@ export interface CodeGenArgs {
     projectType?: ProjectType;
     images?: ImageAttachment[];
 
+    /**
+     * Optional AIModels id (e.g. "anthropic/claude-fable-5") chosen on the
+     * front page. Applied to the main generation actions for this session;
+     * invalid values are ignored and defaults apply.
+     */
+    selectedModel?: string;
+
     /** Optional ephemeral credentials (BYOK / gateway override) for sdk */
     credentials?: CredentialsPayload;
 }

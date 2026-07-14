@@ -34,6 +34,9 @@ export function getProviderInfo(modelValue?: string): ProviderInfo {
 	if (modelValue.includes('google-ai-studio/') || modelValue.includes('gemini')) {
 		return { name: 'Google', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400' };
 	}
+	if (modelValue.includes('zai/') || modelValue.includes('glm')) {
+		return { name: 'Z.ai', color: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/20 dark:text-cyan-400' };
+	}
 
 	return { name: 'Custom', color: 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400' };
 }

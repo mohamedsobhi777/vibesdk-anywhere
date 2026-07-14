@@ -345,6 +345,8 @@ function directProviderBaseUrl(provider: string): string | null {
             return 'https://api.openai.com/v1/';
         case 'grok':
             return 'https://api.x.ai/v1/';
+        case 'zai':
+            return 'https://api.z.ai/api/paas/v4/';
         default:
             return null;
     }
@@ -510,7 +512,7 @@ export async function getConfigurationForModel(
             throw new Error(
                 `No AI gateway is configured and provider '${modelConfig.provider}' has no direct endpoint. ` +
                 `Set CLOUDFLARE_AI_GATEWAY_URL, or select a provider with a direct endpoint ` +
-                `(google-ai-studio, anthropic, openai, grok, openrouter).`,
+                `(google-ai-studio, anthropic, openai, grok, zai, openrouter).`,
             );
         }
         // `directOverride` requested for a provider only reachable via the
